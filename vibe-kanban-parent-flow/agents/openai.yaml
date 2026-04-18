@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Kanban Flow"
+  short_description: "Issue-linked parent-task flow for Vibe Kanban delivery."
+  default_prompt: "Use $vibe-kanban-parent-flow to drive a project through Vibe Kanban parent todos, issue-linked workspaces, staged merges to main, and release publishing."
