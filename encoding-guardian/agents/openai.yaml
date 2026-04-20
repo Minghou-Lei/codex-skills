@@ -1,0 +1,3 @@
+display_name: Encoding Guardian
+short_description: Preserve legacy source encodings before and after AI edits.
+default_prompt: Help me edit a mixed-encoding legacy codebase without corrupting file encodings.

@@ -1,0 +1,3 @@
+display_name: SVN Workflow
+short_description: Use SVN equivalents and safe agent practices for Subversion projects.
+default_prompt: Help me work in an SVN-based project safely, using Subversion commands instead of Git.
