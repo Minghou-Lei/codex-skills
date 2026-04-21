@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Kanban Protocol"
+  short_description: "Shared multi-agent protocol for Vibe Kanban delivery."
+  default_prompt: "Use $vibe-kanban-agent-protocol to coordinate planner, executor, reviewer, integrator, and cleanup agents around issue topology, relationships, issue-linked workspaces, staged integration to main, and safe cleanup."
