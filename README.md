@@ -8,7 +8,6 @@ This repository stores a curated set of local Codex skills and routing instructi
 
 | Skill / 技能 | Purpose / 用途 |
 | --- | --- |
-| `karpathy-guidelines` | Reduces common AI coding mistakes through explicit assumptions, simple designs, surgical edits, and verifiable success criteria. / 通过明确假设、保持简单、控制改动范围和定义可验证目标，降低 AI 编码常见失误。 |
 | `code-comment` | Enforces Chinese code-comment quality gates for generated, modified, reviewed, or documented code. / 为代码生成、修改、审查和文档化执行中文注释质量闸门。 |
 | `encoding-guardian` | Protects mixed-encoding legacy files, especially GBK/ANSI and UTF-8-BOM source trees. / 保护混合编码旧工程文件，尤其是 GBK/ANSI 与 UTF-8-BOM 源码。 |
 | `svn-workflow` | Maps Git habits to SVN-safe workflows for projects that use Subversion. / 为 SVN 项目提供替代 Git 习惯的安全工作流。 |
@@ -22,7 +21,6 @@ This repository stores a curated set of local Codex skills and routing instructi
 ├── sync-codex-global.ps1
 ├── code-comment/
 ├── encoding-guardian/
-├── karpathy-guidelines/
 ├── svn-workflow/
 └── vibe-kanban-agent-protocol/
 ```
