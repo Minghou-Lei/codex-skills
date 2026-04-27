@@ -152,7 +152,7 @@ $fallbackAgentsPath = Join-Path $userHome 'AGENTS.md'
 $sourceSkillsRoot = Join-Path $userHome '.codex\skills'
 $destinationAgentsPath = Join-Path $repoRoot 'AGENTS.md'
 $gitIgnorePath = Join-Path $repoRoot '.gitignore'
-$preserveNames = @('.git', '.gitignore', 'sync-codex-global.ps1')
+$preserveNames = @('.git', '.gitignore', 'LICENSE', 'README.md', 'sync-codex-global.ps1')
 $ignorePatterns = @()
 if (Test-Path -LiteralPath $gitIgnorePath -PathType Leaf) {
     $ignorePatterns = ([IO.File]::ReadAllText($gitIgnorePath) -split "`r?`n") |
