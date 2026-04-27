@@ -1,6 +1,11 @@
 # 双保险：这些目录即使被误复制，也不会进入 Git 提交。
-gsd-*/
+
+# Codex 官方技能
 codex-primary-runtime/
+.system/
+
+# Github 上安装的技能
+gsd-*/
 superpowers*/
 claude-code-game-studios/
 huashu-design/
