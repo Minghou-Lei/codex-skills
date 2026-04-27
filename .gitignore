@@ -1,0 +1,5 @@
+# 双保险：这些目录即使被误复制，也不会进入 Git 提交。
+gsd-*/
+codex-primary-runtime/
+superpowers*/
+claude-code-game-studios/
