@@ -1,15 +1,19 @@
 ---
 name: svn-workflow
 description: >
-  SVN (Subversion) version control workflow for projects that do not use Git.
+  SVN (Subversion) and mixed Git/SVN version-control workflow.
   Use this skill whenever:
+  - The user mentions Git, SVN, version control, commit, submit, add, staging, status, diff, revert, branch, tag, update, or log
+  - The user says "版本控制", "提交", "本地库", "add", "Git", "SVN", "git", "svn", "TortoiseSVN", or "VisualSVN"
   - The conversation is about JX3QJ project work (JX3QJ, 剑网三, SO3Client, KG3DEngine, KGUI, GameDesignerEditor, sword3-products, Base, DevEnv)
   - The project uses SVN (svn:// or https:// SVN URLs, presence of .svn directories)
   - The user asks to commit, update, diff, revert, branch, tag, or check status using SVN
+  - The repository uses both Git and SVN and the user asks to submit to one or both systems
   - You need to replace a Git-based workflow with SVN equivalents
   - The user says "我们用SVN" or mentions TortoiseSVN, VisualSVN, or svn commands
   - You need to handle SVN conflicts, externals, or working copy management
-  Do NOT use Git commands (git commit, git push, etc.) in SVN projects. Always use svn equivalents.
+  In pure SVN projects, do NOT use Git commands (git commit, git push, etc.). Always use svn equivalents.
+  In mixed Git/SVN projects, inspect both working-copy states and commit each system with its own commands.
 ---
 
 # SVN Workflow
@@ -161,6 +165,27 @@ svn status | Where-Object { $_ -match '^\?' } |
 # Delete a file
 svn delete old_file.cpp
 ```
+
+### Windows Unicode path add pitfall
+
+Observed on Windows with TortoiseSVN `svn.exe` 1.15.0-dev:
+
+- `svn status` can show Chinese filenames as `????` while the real files exist on disk.
+- `svn add "reports\...\wj_ylc圣女雕像001_001_hd.xxx.json"` can fail with `W155010 ... not found` / `E200009 Illegal target`.
+- `chcp 65001`, PowerShell `LiteralPath`, Node `spawnSync`, and full absolute paths may still fail because the SVN client decodes the argument path through the wrong codepage.
+- Directory-level recursive add can succeed because SVN enumerates children itself:
+
+```powershell
+svn add --force --depth infinity -- reports\import_results
+svn commit reports\import_results -m "Feature: 提交验证报告" --encoding UTF-8 --non-interactive
+```
+
+Agent rule:
+
+1. If single-file `svn add` fails for a non-ASCII path but the file exists, do not rename the file unless the user approves.
+2. Retry at the nearest already-versioned parent directory with `svn add --force --depth infinity -- <dir>`.
+3. Re-run `svn status` and commit the parent directory or the scheduled `A` targets.
+4. Keep generated caches such as `DerivedDataCache`, `Saved`, `Intermediate`, and missing `!` generated files out of the commit unless the user explicitly asks to version them.
 
 ### Revert local changes
 ```bash
