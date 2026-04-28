@@ -1,19 +1,10 @@
 ---
 name: svn-workflow
 description: >
-  SVN (Subversion) and mixed Git/SVN version-control workflow.
-  Use this skill whenever:
-  - The user mentions Git, SVN, version control, commit, submit, add, staging, status, diff, revert, branch, tag, update, or log
-  - The user says "版本控制", "提交", "本地库", "add", "Git", "SVN", "git", "svn", "TortoiseSVN", or "VisualSVN"
-  - The conversation is about JX3QJ project work (JX3QJ, 剑网三, SO3Client, KG3DEngine, KGUI, GameDesignerEditor, sword3-products, Base, DevEnv)
-  - The project uses SVN (svn:// or https:// SVN URLs, presence of .svn directories)
-  - The user asks to commit, update, diff, revert, branch, tag, or check status using SVN
-  - The repository uses both Git and SVN and the user asks to submit to one or both systems
-  - You need to replace a Git-based workflow with SVN equivalents
-  - The user says "我们用SVN" or mentions TortoiseSVN, VisualSVN, or svn commands
-  - You need to handle SVN conflicts, externals, or working copy management
-  In pure SVN projects, do NOT use Git commands (git commit, git push, etc.). Always use svn equivalents.
-  In mixed Git/SVN projects, inspect both working-copy states and commit each system with its own commands.
+  SVN (Subversion) and mixed Git/SVN workflow guidance.
+  Use when the repo uses SVN or both SVN and Git, especially for status,
+  diff, add, revert, update, commit, log, conflicts, externals, or JX3QJ work.
+  In pure SVN projects, use SVN commands instead of Git.
 ---
 
 # SVN Workflow
