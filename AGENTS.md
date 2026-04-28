@@ -61,7 +61,39 @@ After /clear or /compact: knowledge base and session stats preserved. Use `ctx p
 
 ## Windows notes
 
-**PowerShell cmdlets** — Sandbox uses bash. PowerShell cmdlets (`Format-List`, `Get-Culture`, etc.) fail with `command not found`. Wrap with `pwsh -NoProfile -Command "..."`.
+context-mode `language: "shell"` is Git Bash / MSYS2 on this Windows machine.
+Do not rely on fallback PowerShell. Treat shell as bash.
+
+For any PowerShell logic, do NOT inline complex `pwsh -Command`.
+Instead:
+1. Write a temporary `.ps1` file.
+2. Run it from bash using:
+
+`pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<script.ps1>"`
+
+PowerShell-required patterns:
+- `Get-*`, `Set-*`, `New-*`, `Remove-*`
+- `Test-Path`, `Resolve-Path`
+- `Select-Object`, `Where-Object`, `ForEach-Object`
+- `$env:`, `$_`, `$PSVersionTable`
+- `[System.IO.*]`
+
+These must never appear raw in bash commands.
+
+Use path boundary rules:
+- Bash side: `/f/Repo/Project`
+- PowerShell side: `F:\Repo\Project`
+- Convert explicitly with `cygpath -w` or `cygpath -u` when crossing the boundary.
+
+Preferred pattern for PowerShell from context-mode:
+
+```bash
+cat > /tmp/task.ps1 <<'PS1'
+$ErrorActionPreference = "Stop"
+Get-ChildItem -LiteralPath "C:\Users\KSG" | Select-Object -First 5 Name
+PS1
+
+pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w /tmp/task.ps1)"
 
 **Relative paths** — Sandbox CWD is temp dir, not project root. Convert to absolute paths. Ask user to confirm if unknown.
 
