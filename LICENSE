@@ -1,37 +1,86 @@
-Proprietary License - All Rights Reserved
+Proprietary License with Third-Party Component Exception
 
 Copyright (c) 2026 Minghou-Lei.
 
-This repository and all files, documentation, scripts, skills, prompts,
-instructions, examples, references, and other materials in it are proprietary.
-All rights are reserved.
+1. Proprietary Materials
+
+Except for Third-Party Components as defined below, this repository and all
+original files, documentation, scripts, skills, prompts, instructions, examples,
+references, selection, arrangement, and other materials authored or owned by
+Minghou-Lei are proprietary. All rights are reserved.
 
 No permission is granted to any person or entity to use, copy, modify, merge,
 publish, distribute, sublicense, sell, lease, rent, host, provide as a service,
-commercialize, create derivative works from, or otherwise exploit this
-repository or any substantial portion of it without prior written permission
-from the copyright holder.
+commercialize, create derivative works from, or otherwise exploit the
+Proprietary Materials without prior written permission from Minghou-Lei.
 
-Commercial use is strictly prohibited without prior written permission.
-Non-commercial use is also prohibited unless expressly authorized in writing.
+Commercial use of the Proprietary Materials is strictly prohibited without prior
+written permission. Non-commercial use of the Proprietary Materials is also
+prohibited unless expressly authorized in writing.
 
 Automated scraping, dataset creation, model training, model fine-tuning,
 embedding generation, prompt extraction, benchmarking, redistribution through
 package managers, marketplace publication, and inclusion in other products or
-services are prohibited without prior written permission.
+services are prohibited for the Proprietary Materials without prior written
+permission.
+
+2. Third-Party Components
+
+"Third-Party Components" means files, directories, code, documentation, assets,
+examples, fonts, templates, prompts, or other materials that include their own
+license file, license header, attribution notice, upstream copyright notice,
+source reference, or other indication that they originate from a third party or
+are made available under an open-source or other third-party license.
+
+Third-Party Components are not relicensed by this license. They remain governed
+solely by their respective license notices, license files, headers, attribution
+requirements, upstream terms, and applicable law.
+
+Nothing in this license removes, replaces, sublicenses, narrows, or expands any
+rights or obligations that apply to a Third-Party Component under its own
+license. If this license conflicts with a Third-Party Component's own license,
+the Third-Party Component's own license controls for that component.
+
+All copyright notices, license texts, NOTICE files, attribution statements,
+source references, and modification notices for Third-Party Components must be
+preserved. They must be preserved as required by their respective licenses.
+
+3. Repository Compilation
+
+To the maximum extent permitted by law, Minghou-Lei reserves all rights in the
+repository-level documentation, routing rules, sync scripts, original glue
+materials, selection, coordination, and arrangement of this repository.
+
+The inclusion of a Third-Party Component in this repository does not grant any
+permission to use the Proprietary Materials, and the proprietary status of this
+repository's original materials does not restrict rights that a third-party
+license grants for that Third-Party Component.
+
+4. Platform Viewing
 
 Viewing the repository on its hosting platform is permitted only to the extent
 required by the platform's mandatory terms and does not grant any additional
-license or usage rights.
+license or usage rights for the Proprietary Materials.
+
+5. No Other Rights
 
 No patent, trademark, trade secret, or other intellectual property license is
-granted.
+granted for the Proprietary Materials unless expressly stated in a separate
+written agreement signed by Minghou-Lei.
 
-THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR
-A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN
-CONNECTION WITH THE MATERIALS OR THEIR USE.
+6. Disclaimer
 
-Any permission, exception, or commercial license must be granted in a separate
-written agreement signed by the copyright holder.
+THE PROPRIETARY MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+MINGHOU-LEI BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR
+IN CONNECTION WITH THE PROPRIETARY MATERIALS OR THEIR USE.
+
+Third-Party Components may include their own warranty disclaimers, limitations
+of liability, or other legal terms. Those terms remain governed by the
+applicable Third-Party Component license.
+
+7. Written Permission
+
+Any permission, exception, or commercial license for the Proprietary Materials
+must be granted in a separate written agreement signed by Minghou-Lei.

@@ -2,32 +2,46 @@
 
 本仓库保存一组面向 Codex 的本地技能与全局路由说明，用于把常用工程约束、编码规范、版本控制流程和多 Agent 协作协议沉淀为可复用的 `SKILL.md`。
 
-This repository stores a curated set of local Codex skills and routing instructions. It turns recurring engineering rules, coding conventions, version-control workflows, and multi-agent coordination protocols into reusable `SKILL.md` packages.
+This repository stores local Codex skills and routing instructions. It turns recurring engineering rules, coding conventions, version-control workflows, and multi-agent coordination protocols into reusable `SKILL.md` packages.
 
 ## Contents / 内容
 
-| Skill / 技能 | Purpose / 用途 |
-| --- | --- |
-| `code-comment` | Enforces Chinese code-comment quality gates for generated, modified, reviewed, or documented code. / 为代码生成、修改、审查和文档化执行中文注释质量闸门。 |
-| `encoding-guardian` | Protects mixed-encoding legacy files, especially GBK/ANSI and UTF-8-BOM source trees. / 保护混合编码旧工程文件，尤其是 GBK/ANSI 与 UTF-8-BOM 源码。 |
-| `svn-workflow` | Maps Git habits to SVN-safe workflows for projects that use Subversion. / 为 SVN 项目提供替代 Git 习惯的安全工作流。 |
-| `vibe-kanban-agent-protocol` | Defines issue topology, workspace usage, integration, cleanup, and leadership rules for Vibe Kanban multi-agent work. / 定义 Vibe Kanban 多 Agent 协作中的任务关系、工作区、集成、清理和负责人规则。 |
+| Skill / 技能 | Purpose / 用途 | License source / 许可来源 |
+| --- | --- | --- |
+| `algorithmic-art` | Seeded p5.js generative art, flow fields, particle systems, and interactive visual parameter exploration. / 用于基于 p5.js 的生成艺术、流场、粒子系统和交互式参数探索。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
+| `brand-guidelines` | Applies Anthropic brand colors, typography, and visual style to artifacts. / 为制品应用 Anthropic 品牌色、字体和视觉风格。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
+| `canvas-design` | Creates visual art, posters, PDFs, and static design outputs. / 创建视觉艺术、海报、PDF 和静态设计输出。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
+| `code-comment` | Enforces Chinese code-comment quality gates for generated, modified, reviewed, or documented code. / 为代码生成、修改、审查和文档化执行中文注释质量闸门。 | Repository license unless otherwise stated / 未另行声明时适用仓库许可 |
+| `encoding-guardian` | Protects mixed-encoding legacy files, especially GBK/ANSI and UTF-8-BOM source trees. / 保护混合编码旧工程文件，尤其是 GBK/ANSI 与 UTF-8-BOM 源码。 | Repository license unless otherwise stated / 未另行声明时适用仓库许可 |
+| `frontend-design` | Creates production-grade frontend interfaces and visual web artifacts. / 创建生产级前端界面和视觉 Web 制品。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
+| `svn-workflow` | Maps Git habits to SVN-safe workflows for projects that use Subversion or mixed SVN/Git. / 为 SVN 或 SVN/Git 混合项目提供安全工作流。 | Repository license unless otherwise stated / 未另行声明时适用仓库许可 |
+| `theme-factory` | Applies preset themes, color systems, and typography to slides, docs, reports, and HTML artifacts. / 为幻灯片、文档、报告和 HTML 制品应用主题、配色和字体系统。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
+| `vibe-kanban-agent-protocol` | Defines issue topology, workspace usage, integration, cleanup, and leadership rules for Vibe Kanban multi-agent work. / 定义 Vibe Kanban 多 Agent 协作中的任务关系、工作区、集成、清理和负责人规则。 | Repository license unless otherwise stated / 未另行声明时适用仓库许可 |
+| `web-artifacts-builder` | Builds complex HTML artifacts with React, Tailwind CSS, shadcn/ui, routing, and state management. / 使用 React、Tailwind CSS、shadcn/ui、路由和状态管理构建复杂 HTML 制品。 | See skill-local `LICENSE.txt` / 见技能目录内 `LICENSE.txt` |
 
 ## Repository Layout / 仓库结构
 
 ```text
 .
 ├── AGENTS.md
+├── LICENSE
+├── README.md
 ├── sync-codex-global.ps1
+├── algorithmic-art/
+├── brand-guidelines/
+├── canvas-design/
 ├── code-comment/
 ├── encoding-guardian/
+├── frontend-design/
 ├── svn-workflow/
-└── vibe-kanban-agent-protocol/
+├── theme-factory/
+├── vibe-kanban-agent-protocol/
+└── web-artifacts-builder/
 ```
 
-Each skill directory contains a `SKILL.md`. Some skills also include `agents/`, `references/`, or `scripts/` for supporting material.
+Each skill directory contains a `SKILL.md`. Some skills also include `agents/`, `references/`, `scripts/`, `templates/`, `themes/`, fonts, or skill-local license files.
 
-每个技能目录都包含 `SKILL.md`。部分技能还包含 `agents/`、`references/` 或 `scripts/`，用于存放辅助材料。
+每个技能目录都包含 `SKILL.md`。部分技能还包含 `agents/`、`references/`、`scripts/`、`templates/`、`themes/`、字体或技能目录内许可文件。
 
 ## Usage / 使用方式
 
@@ -66,7 +80,7 @@ Recommended dry run:
 建议先执行预演：
 
 ```powershell
-pwsh -NoProfile -File .\sync-codex-global.ps1 -WhatIf
+powershell -NoProfile -File .\sync-codex-global.ps1 -WhatIf
 ```
 
 Sync without pushing:
@@ -74,12 +88,30 @@ Sync without pushing:
 同步但不推送：
 
 ```powershell
-pwsh -NoProfile -File .\sync-codex-global.ps1 -SkipPush
+powershell -NoProfile -File .\sync-codex-global.ps1 -SkipPush
 ```
 
 Warning: the script uses a force push when pushing to the remote default branch. Review the staged diff before running it without `-WhatIf` or `-SkipPush`.
 
 注意：该脚本推送时会对远端默认分支执行 force push。不带 `-WhatIf` 或 `-SkipPush` 运行前，请先审查暂存差异。
+
+## Licensing / 许可说明
+
+This repository uses a proprietary root `LICENSE` for Minghou-Lei's original materials, repository-level documentation, routing rules, sync scripts, selection, and arrangement.
+
+本仓库根目录 `LICENSE` 对 Minghou-Lei 的原创材料、仓库级文档、路由规则、同步脚本、选编与编排适用专有许可。
+
+Some skill directories may contain Third-Party Components, including third-party or open-source materials. Those materials remain governed by their own license notices, license files, headers, and upstream terms. The root `LICENSE` does not remove, replace, sublicense, or restrict rights that a third-party open-source license grants for that third-party component.
+
+部分技能目录可能包含第三方或开源材料。这些材料仍受其自身许可声明、许可文件、文件头和上游条款约束。根目录 `LICENSE` 不会移除、替换、再授权或限制第三方开源许可证对对应第三方组件授予的权利。
+
+When adding open-source skills, keep the original `LICENSE`, `LICENSE.txt`, `NOTICE`, copyright notices, attribution text, and source references with the imported skill.
+
+添加开源技能时，请保留导入技能自带的 `LICENSE`、`LICENSE.txt`、`NOTICE`、版权声明、署名文本和来源引用。
+
+This README is a practical repository note, not legal advice. For distribution, commercial use, or mixed-license reuse, review each component's license and consult qualified counsel when needed.
+
+本 README 只是仓库使用说明，不构成法律意见。涉及分发、商用或混合许可证复用时，请逐项审查组件许可证，并在需要时咨询专业法律人士。
 
 ## Requirements / 环境要求
 
@@ -92,9 +124,3 @@ Warning: the script uses a force push when pushing to the remote default branch.
 - Git 命令行。
 - 需要识别远端仓库、默认分支或推送时，需要 GitHub CLI (`gh`)。
 - 已配置的 Codex 全局技能目录：`C:\Users\KSG\.codex\skills`。
-
-## License / 许可
-
-This repository is proprietary and all rights are reserved. See `LICENSE`. No use, copying, modification, distribution, commercial use, service hosting, or model-training use is allowed without prior written permission.
-
-本仓库采用专有许可并保留全部权利。详见 `LICENSE`。未经事先书面授权，不允许使用、复制、修改、分发、商用、托管为服务或用于模型训练。
