@@ -1,119 +1,123 @@
-# Windows CN Local Contract
+# Windows Codex Contract
 
-Purpose: supplement the session hook. The hook owns context-mode routing and write-policy details. This file only fixes persistent local mistakes on Windows 11 Chinese environments.
+Purpose: make Codex reliable on this Windows 11 + Chinese-path + Unreal/Unity workspace.
+Keep this file short. The session hook owns generic `ctx_*` routing; this file only fixes local execution failures.
 
-## Priority
+## 0. Non-negotiable rule
 
-1. User request
-2. Safety / irreversible checks
-3. Session hook: `context_window_protection`
-4. This file
-5. Repo-local build/test rules
+For Windows repo/file discovery, use the consumer that will actually read the files.
 
-Stricter rule wins.
+If the task touches any of these:
 
-## Machine facts
+- Windows drive path: `C:\...`, `F:\...`, `J:\...`
+- Unreal/Unity/MSBuild/Visual Studio project
+- `.uproject`, `.uasset`, `.sln`, `.vcxproj`, `.csproj`, `Content/`, `Plugins/`
+- Chinese/non-ASCII path or filename
+- external project/sample path
+- repo tree discovery or source-file lookup
 
-- OS: Windows 11, Chinese-capable filesystem/user environment.
-- context-mode `shell` commands run as Git Bash / MSYS2 by default.
-- Git Bash paths: `/c/...`, `/f/...`, `/j/...`.
-- Windows native paths: `C:\...`, `F:\...`, `J:\...`.
-- WSL is not used. Never emit `/mnt/c/...`, `/mnt/f/...`, `/mnt/j/...`.
+then FIRST probe with Windows-native filesystem access:
 
-## Command preflight
+```text
+ctx_execute(language: "javascript") using Node built-ins: fs, path, child_process
+```
 
-Before running any command, classify it.
+Do NOT start with Git Bash `ls`, `find`, `rg`, `grep`, `test -e`, or `cygpath -> ls/rg`.
 
-### `BASH_SAFE_SMALL`
+Git Bash may be used only after the exact Windows repo root/path has been proven.
 
-Use only for small bounded Git Bash work: `git`, `rg -m`, `find ... | head`, `mkdir`, `rm`, `mv`, navigation.
+## 1. Evidence before search
 
-Rules:
+`(no output)` is not evidence.
 
-- Use `/x/path` paths.
-- Quote every path.
-- Bound output.
-- Do not pass complex Chinese paths through raw argv when a manifest/wrapper is practical.
+A path is verified only if the probe prints structured facts:
 
-### `POWERSHELL_REQUIRED`
+```json
+{
+  "consumer": "Node fs/path",
+  "cwd": "...",
+  "root": "J:\\...",
+  "rootExists": true,
+  "target": "...",
+  "targetExists": true,
+  "type": "file|directory|missing"
+}
+```
 
-Any use of PowerShell cmdlets/syntax requires a `.ps1` wrapper:
+`cygpath` output only proves string conversion, not filesystem accessibility.
 
-- `Get-*`, `Set-*`, `New-*`, `Remove-*`, `Test-Path`, `Resolve-Path`
-- `Select-Object`, `Where-Object`, `ForEach-Object`, `Format-*`
-- `$env:`, `$_`, `$PSVersionTable`, `[System.IO.*]`
+Do not say "not found" until the verified absolute root was searched by the correct consumer.
 
-Rules:
-
-- Never run PowerShell syntax directly in Git Bash.
-- Create/edit `.ps1` with native Write/Edit tools.
-- Run via `pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`.
-- Use `powershell.exe -File` only if `pwsh` is unavailable, and keep scripts encoding-safe.
-
-### `WINDOWS_NATIVE_WITH_NON_ASCII_PATHS`
-
-For Windows tools receiving Chinese/non-ASCII paths, prefer `.ps1` wrapper + UTF-8 JSON/TXT manifest:
-
-- `python.exe`, `pwsh.exe`, `powershell.exe`
-- `UnrealEditor.exe`, `UnrealEditor-Cmd.exe`, `Unity.exe`
-- `MSBuild.exe`, `devenv.exe`, custom `.exe` tools
-
-Do not trust Bash `test -e` for a path later consumed by a Windows-native process. Verify in the consumer environment.
-
-### `AMBIGUOUS`
-
-Mixed Bash + PowerShell syntax, mixed path styles, or unclear interpreter: stop and rewrite as `.ps1`, `.py`, `.js`, or small Bash.
-
-## Actual path re-grounding
+## 2. Path re-grounding
 
 If a lookup missed the real directory, stop searching from CWD.
 
-Re-anchor first:
+Re-anchor:
 
-1. Identify path domain: Windows `C:\...`, Git Bash `/c/...`, or proven repo-relative path.
-2. Verify the absolute parent directory exists.
+1. Identify path domain:
+   - Windows-native: `X:\path`
+   - Git Bash/MSYS2: `/x/path`
+   - Repo-relative: only after repo root is proven
+2. Verify absolute parent exists.
 3. Search only inside the verified root.
-4. Do not claim `not found` until that verified absolute root was searched.
-5. Never run PowerShell syntax directly in Git Bash; use `.ps1 + pwsh -File`.
+4. If the user supplied an absolute Windows path, preserve it as the source of truth.
 
-Avoid: relative guess -> not found -> another relative guess.  
-Use: expected absolute root -> verify root -> search inside root.
+Never emit WSL paths here: no `/mnt/c/...`, no `/mnt/f/...`.
 
-## Path conversion
+## 3. Shell identity
 
-- Bash -> Windows: `cygpath -w '/f/Repo'`
-- Windows -> Bash: `cygpath -u 'F:\Repo'`
-- PowerShell filesystem paths: use `-LiteralPath`.
-- Always quote paths.
-- Do not assume CWD is repo root. Prove repo root or use absolute paths.
+context-mode shell is Git Bash/MSYS2 unless PowerShell is explicitly invoked.
 
-## MSYS2 argv/path conversion pitfalls
+### Bash-safe
 
-When Git Bash calls native Windows programs, MSYS2 may auto-convert Unix-looking args into Windows paths.
+Use Bash only for small bounded work:
 
-High-risk literals:
-
-- `/c`, `/C`, `/sdcard`, `/data`, `/tmp`
-- `--root=/`, `--mount=/x/y`, Docker/ADB/WSL-like args
-- Any native `.exe` that expects Unix-style switches or literal slash paths
-
-If needed, disable conversion locally:
-
-```bash
-MSYS2_ARG_CONV_EXCL='*' native.exe /literal/switch --root=/
+```text
+git status/diff/log
+mkdir/rm/mv
+navigation
+bounded ASCII-safe grep/rg after root is proven
 ```
 
-Do not set this globally.
+Rules:
 
-## PowerShell wrapper template
+- Use `/c/...`, `/f/...`, `/j/...`.
+- Quote every path.
+- Bound output.
+- Avoid Chinese paths in raw shell argv.
 
-Run from Git Bash/context-mode shell:
+### PowerShell-required
+
+The following must not appear raw in Bash:
+
+```text
+Get-* Set-* New-* Remove-* Test-Path Resolve-Path
+Select-Object Where-Object ForEach-Object Format-*
+$env: $_ $PSVersionTable [System.*]
+```
+
+Use `.ps1 + pwsh -File`.
+
+## 4. PowerShell wrapper
+
+For nontrivial Windows work:
+
+1. Create/edit `.ps1` with native Write/Edit tools.
+2. Keep `.ps1` ASCII-only when practical.
+3. Put Chinese/non-ASCII paths into UTF-8 JSON/TXT manifests.
+4. Run from Git Bash:
 
 ```bash
 pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-Recommended `.ps1` header for file/tool work:
+Fallback only if `pwsh` is unavailable:
+
+```bash
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
+```
+
+Header for `.ps1` that touches files, Python, Unreal, Unity, MSBuild, or custom Windows tools:
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -127,116 +131,117 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 }
 ```
 
-Avoid complex `pwsh -Command` / `powershell -Command` one-liners.
+## 5. MSYS2 conversion traps
 
-## Chinese path / Unicode rules
+When Bash calls native Windows executables, MSYS2 may rewrite path-like args.
 
-Treat Chinese-path failures as boundary/encoding bugs first.
+Avoid passing literal Linux-style options to native exe unless intended.
 
-Bad signs:
+If needed, use local one-shot exclusions only:
 
-- Literal `\uXXXX` inside paths: escaped text reused as a path.
-- `????`: lossy codepage conversion.
-- `é—¨æ´¾`-style text: UTF-8/GBK mojibake.
-- Git octal/quoted paths: Git path escaping.
-- False `FileNotFoundError` on known Chinese path: verify in consumer environment.
+```bash
+MSYS2_ARG_CONV_EXCL='*' native.exe --literal=/foo
+MSYS2_ENV_CONV_EXCL='VAR' VAR=/foo native.exe
+```
 
-Keep representations separate:
+Do not set these globally.
 
-- Valid: `F:\...\门派室内长歌门\JZ_cgm`
-- Invalid path text: `F:\...\\u95E8\\u6D3E...\JZ_cgm`
-- Corrupt path text: `F:\...\é—¨æ´¾...` or `????`
+## 6. Unicode / Chinese path rules
 
-Do not manually patch mojibake unless explicitly doing data recovery. Regenerate from the original Unicode source.
+Most Chinese-path failures are boundary bugs.
 
-## Git path output
+Stop and diagnose encoding first when seeing:
+
+| Symptom | Meaning | Action |
+|---|---|---|
+| `\u95E8...` in a path | escaped text reused as path | decode/regenerate |
+| `????` | codepage loss | rerun through UTF-8 wrapper/manifest |
+| `é—¨æ´¾` | mojibake | regenerate from original Unicode |
+| false `FileNotFoundError` | wrong consumer/encoding | verify in the consuming environment |
+| quoted/octal Git path | Git escaping | use `-z` or `core.quotepath=false` |
+
+For manifests:
+
+- JSON: `ensure_ascii=false`
+- Read/write UTF-8 explicitly.
+- Print normal `str(path)`, not unlabeled `repr(path)`.
+
+## 7. Git path output
+
+For machine parsing:
+
+```bash
+git -c core.quotepath=false status --porcelain=v1 -z
+git -c core.quotepath=false diff --name-status -z
+git -c core.quotepath=false ls-files -z
+```
 
 For human display:
 
 ```bash
 git -c core.quotepath=false status --short
 git -c core.quotepath=false diff --name-only
-git -c core.quotepath=false ls-files
 ```
 
-For script parsing, prefer NUL output:
+Do not change global Git config unless asked.
 
-```bash
-git -c core.quotepath=false status --porcelain=v1 -z
-git -c core.quotepath=false diff --name-only -z
-git -c core.quotepath=false ls-files -z
-```
+## 8. File writes
 
-Do not change global Git config unless the user asks.
+Follow hook write policy.
 
-## Non-ASCII path manifests
+Local reinforcement:
 
-Do not pass complex Chinese paths through shell quoting if a manifest is practical. Use UTF-8 JSON/TXT.
+- Use native Write/Edit for source, configs, markdown, JSON, YAML, scripts, manifests.
+- Do not create files through Bash heredoc, Python writes, Node writes, or `ctx_execute` unless the user explicitly asks for that path.
+- Avoid `.bat` / `.cmd` for Chinese Windows automation.
+- Prefer `.ps1`, `.py`, `.js`, UTF-8 JSON/TXT.
 
-Python JSON rule:
+## 9. Code-task skill loading
 
-```python
-Path(p).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-data = json.loads(Path(p).read_text(encoding="utf-8"))
-```
+For code edits/reviews/debugging/scripts/shaders/build automation:
 
-Node JSON rule:
+- Load `C:\Users\KSG\.codex\skills\karpathy-guidelines\SKILL.md`
+- Load `C:\Users\KSG\.codex\skills\code-comment\SKILL.md`
 
-```javascript
-fs.writeFileSync(p, JSON.stringify(data, null, 2), "utf8");
-const data = JSON.parse(fs.readFileSync(p, "utf8"));
-```
+Do not dump skill contents. Apply them silently.
+If inaccessible, state once and continue.
 
-Diagnostics: print `str(path)` normally. Use `repr(path)` only when labeled as encoding diagnostics.
+Use heavier workflow skills only when task clearly needs planning/research.
+Do not over-route trivial edits.
 
-## Chinese `FileNotFoundError` playbook
+## 10. Worktree safety
 
-When a known Chinese/non-ASCII path is reported missing:
-
-1. Capture the exact path received by the failing process.
-2. Check for `\uXXXX`, `????`, mojibake, Git escaping.
-3. Verify with PowerShell `Test-Path -LiteralPath` inside a `.ps1` wrapper.
-4. Check manifest encoding is UTF-8 and JSON used `ensure_ascii=False`.
-5. Rerun through `.ps1 + pwsh -File` with UTF-8 header.
-6. Only then inspect business logic.
-
-## File edits
-
-The hook owns the detailed write policy. Local reminder:
-
-- Use native Write/Edit tools for code, configs, markdown, JSON, YAML, manifests, and wrappers.
-- Do not create/modify files with Bash heredoc or ad-hoc script writes unless the user explicitly asks.
-- Avoid `.bat` / `.cmd` for Chinese Windows automation. Prefer `.ps1`, `.py`, `.js`.
-
-## Skill routing
-
-For code generation, modification, review, debugging, refactor, tests, scripts, shaders, build files, or automation:
-
-1. Load `C:\Users\KSG\.codex\skills\karpathy-guidelines\SKILL.md`.
-2. Load `C:\Users\KSG\.codex\skills\code-comment\SKILL.md`.
-3. Apply both.
-
-If unavailable, state that and continue with closest known rules. Do not dump skill contents for trivial Q&A.
-
-## Execution self-check
-
-Before claiming done, verify:
-
-- No raw PowerShell syntax in Git Bash.
-- Bash paths are `/x/path`; Windows paths are `X:\path`.
-- No `/mnt/x/...` paths.
-- Actual root was verified before searching after a miss.
-- Output is bounded or routed through context-mode.
-- Non-ASCII paths crossing interpreters use UTF-8 wrapper/manifest.
-- File edits used native Write/Edit tools.
-- Failed checks are reported, not hidden.
-
-## Optional include
-
-If supported by the current Codex environment, also load:
+Before edits:
 
 ```text
-@C:\Users\KSG\.codex\RTK.md
+check git status
+identify user changes
+avoid overwriting unrelated files
 ```
 
-If include syntax is unsupported, treat it as an operator note and continue.
+After edits:
+
+```text
+run targeted validation when practical
+show changed files
+report unresolved risks
+```
+
+Commit only when the user asked for commit or the active skill explicitly requires it.
+
+## 11. Response format
+
+Keep replies compact.
+
+Default:
+
+```text
+- Changed: ...
+- Files: ...
+- Verified: ...
+- Notes: ...
+```
+
+No long tool logs.
+No "not found" without evidence.
+No repeated guessing from CWD.
