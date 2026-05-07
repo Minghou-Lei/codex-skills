@@ -1,42 +1,129 @@
-# Windows Codex Contract
+# AGENTS.md — Codex Windows Contract
 
-Purpose: make Codex reliable on this Windows 11 + Chinese-path + Unreal/Unity workspace.
-Keep this file short. The session hook owns generic `ctx_*` routing; this file only fixes local execution failures.
+默认使用 Codex 原生工具：`Read` / `Edit` / `Write` / `Grep` / `Glob`。  
+只有在满足明确条件时，才使用 `shell` 或 `context-mode`。
 
-## 0. Non-negotiable rule
+响应保持简短。  
+失败不得反复猜测；同一路径或同一方向失败 ≥2 次后，必须停止并报告已尝试内容。
 
-For Windows repo/file discovery, use the consumer that will actually read the files.
+---
 
-If the task touches any of these:
+## 0. 总体工具选择原则
 
-- Windows drive path: `C:\...`, `F:\...`, `J:\...`
-- Unreal/Unity/MSBuild/Visual Studio project
-- `.uproject`, `.uasset`, `.sln`, `.vcxproj`, `.csproj`, `Content/`, `Plugins/`
-- Chinese/non-ASCII path or filename
-- external project/sample path
-- repo tree discovery or source-file lookup
+### 默认优先级
 
-then FIRST probe with Windows-native filesystem access:
+1. **优先使用 Codex 原生工具**
+   - `Read`
+   - `Edit`
+   - `Write`
+   - `Grep`
+   - `Glob`
+
+2. **只有满足 §2 条件时，才使用 context-mode**
+
+3. **只有原生工具不适合时，才使用 shell**
+
+---
+
+## 1. 工具决策树
 
 ```text
-ctx_execute(language: "javascript") using Node built-ins: fs, path, child_process
+任务开始
+  │
+  ├─ 是否满足任意 context-mode 触发条件？（见 §2）
+  │    └─ YES → 使用 context-mode MCP
+  │
+  ├─ NO：是否必须使用 shell？
+  │    ├─ NO  → 使用 Read / Edit / Write / Grep / Glob
+  │    └─ YES → 是否涉及 Windows 自动化 / 非 ASCII 路径 / PowerShell 语法？
+  │               ├─ YES → 使用 .ps1 + pwsh -File（见 §5）
+  │               └─ NO  → 允许小型 Bash（必须满足 bounded Bash，见 §4）
+  │
+  └─ 任意路径或工具方向失败 ≥2 次
+       → 停止，报告已尝试内容，等待用户指示
 ```
 
-Do NOT start with Git Bash `ls`, `find`, `rg`, `grep`, `test -e`, or `cygpath -> ls/rg`.
+---
 
-Git Bash may be used only after the exact Windows repo root/path has been proven.
+## 2. context-mode 使用边界
 
-## 1. Evidence before search
+context-mode 只在明确适合“大范围读取、索引、搜索、汇总”时使用。
 
-`(no output)` is not evidence.
+### 2.1 允许触发 context-mode 的条件
 
-A path is verified only if the probe prints structured facts:
+满足以下任意一项即可使用：
+
+- 需要读取或汇总多个文件
+- 需要跨仓库 / 跨模块理解代码
+- 需要对已索引材料进行多轮 follow-up 搜索
+- 原始命令输出可能溢出 chat context
+- 大型日志 / 构建输出需要索引后搜索
+- 用户明确要求使用：
+  - `ctx_search`
+  - `ctx_stats`
+  - `ctx_doctor`
+  - 其他 context-mode 相关能力
+
+### 2.2 禁止触发 context-mode 的场景
+
+以下场景不得使用 context-mode：
+
+- 单文件读取
+- 小型编辑
+- 简单 grep
+- `git status`
+- 配置检查
+- 已知路径查看
+- 小范围、可控输出的本地查询
+
+### 2.3 context-mode 子命令选择
+
+| 场景 | 使用命令 |
+|---|---|
+| 初次索引、多命令并行探索 | `ctx_batch_execute`，必须附带 label |
+| 已知目标的单条后续操作 | `ctx_execute` / `ctx_execute_file` |
+| 索引后跨文件搜索 | `ctx_search` |
+
+---
+
+## 3. Windows 路径规则
+
+### 3.1 Windows 路径必须原样保留
+
+```text
+C:\...
+F:\...
+J:\...
+```
+
+不得无依据改写为其他路径形式。
+
+### 3.2 小型已知路径
+
+对于小型、明确、已知路径，优先使用：
+
+- `Read`
+- `Glob`
+- `Grep`
+
+### 3.3 大规模路径发现
+
+如果是在 Windows 路径下进行大规模发现，允许使用 context-mode。  
+此时应使用 JS `fs/path` 探测路径，不得依赖 Git Bash 路径猜测。
+
+### 3.4 `cygpath` 限制
+
+`cygpath` 只能证明路径字符串转换成功。  
+它不能证明文件或目录真实存在。
+
+### 3.5 路径验证必须提供显式证据
+
+验证路径时，必须说明实际消费者和验证结果：
 
 ```json
 {
-  "consumer": "Node fs/path",
-  "cwd": "...",
-  "root": "J:\\...",
+  "consumer": "Read|Glob|Grep|PowerShell|Node fs",
+  "root": "...",
   "rootExists": true,
   "target": "...",
   "targetExists": true,
@@ -44,80 +131,183 @@ A path is verified only if the probe prints structured facts:
 }
 ```
 
-`cygpath` output only proves string conversion, not filesystem accessibility.
+### 3.6 `(no output)` 不等于“未找到”
 
-Do not say "not found" until the verified absolute root was searched by the correct consumer.
+只有在正确消费者、正确根目录、正确路径域下完成搜索后，才允许判断“未找到”。
 
-## 2. Path re-grounding
+### 3.7 路径 lookup 失败时的重定位流程
 
-If a lookup missed the real directory, stop searching from CWD.
+路径查找失败时，按以下顺序处理：
 
-Re-anchor:
+1. 确认路径域：
+   - Windows-native：`X:\path`
+   - Git Bash：`/x/path`
+   - 仓库相对路径：必须先证明仓库根目录
 
-1. Identify path domain:
-   - Windows-native: `X:\path`
-   - Git Bash/MSYS2: `/x/path`
-   - Repo-relative: only after repo root is proven
-2. Verify absolute parent exists.
-3. Search only inside the verified root.
-4. If the user supplied an absolute Windows path, preserve it as the source of truth.
+2. 验证绝对父目录是否存在
 
-Never emit WSL paths here: no `/mnt/c/...`, no `/mnt/f/...`.
+3. 只在已验证的根目录内搜索
 
-## 3. Shell identity
-
-context-mode shell is Git Bash/MSYS2 unless PowerShell is explicitly invoked.
-
-### Bash-safe
-
-Use Bash only for small bounded work:
+4. 不得使用 WSL 路径：
 
 ```text
-git status/diff/log
-mkdir/rm/mv
+/mnt/c/...
+```
+
+### 3.8 路径重定位停止条件
+
+同一路径重定位失败 ≥2 次后，必须停止。
+
+停止时报告：
+
+- 已尝试的路径
+- 使用过的消费者
+- 每次失败的现象
+- 下一步需要用户确认的信息
+
+禁止继续猜测。
+
+---
+
+## 4. Shell 使用规则
+
+context-mode shell 默认是 Git Bash / MSYS2。  
+除非显式调用 PowerShell，否则不得把 shell 当作 PowerShell 使用。
+
+### 4.1 bounded Bash 定义
+
+只有同时满足以下三条，才允许使用 Bash：
+
+```text
+≤3 条命令
+预期输出 ≤100 行
+argv 不包含非 ASCII 字符
+```
+
+任何一条不满足，都必须改用：
+
+- `.ps1`
+- 或 context-mode
+
+### 4.2 Bash 中禁止直接运行 PowerShell 语法
+
+禁止在 Bash 中直接使用：
+
+```text
+Get-* 
+Set-* 
+New-* 
+Remove-* 
+Test-Path 
+Resolve-Path
+Select-Object
+Where-Object
+ForEach-Object
+Format-*
+$env:
+$_
+$PSVersionTable
+[System.*]
+```
+
+### 4.3 shell 命令必须限制输出
+
+执行任何 shell 命令前，必须添加输出限制。
+
+示例：
+
+```bash
+git log --max-count=20
+find ... -maxdepth 3 | head -50
+grep -m 30 ...
+rg --max-count 30 ...
+```
+
+没有输出限制的命令不得执行。
+
+### 4.4 Bash 允许范围
+
+Bash 仅限以下场景：
+
+```text
+git status / diff / log
+mkdir / rm / mv
 navigation
-bounded ASCII-safe grep/rg after root is proven
+bounded ASCII-safe grep / rg
 ```
 
-Rules:
+前提：根目录已经被证明存在。
 
-- Use `/c/...`, `/f/...`, `/j/...`.
-- Quote every path.
-- Bound output.
-- Avoid Chinese paths in raw shell argv.
+### 4.5 Bash 路径规则
 
-### PowerShell-required
-
-The following must not appear raw in Bash:
+Bash 内路径使用：
 
 ```text
-Get-* Set-* New-* Remove-* Test-Path Resolve-Path
-Select-Object Where-Object ForEach-Object Format-*
-$env: $_ $PSVersionTable [System.*]
+/c/...
+/f/...
+/j/...
 ```
 
-Use `.ps1 + pwsh -File`.
+要求：
 
-## 4. PowerShell wrapper
+- 所有路径必须加引号
+- 避免 argv 中出现中文或其他非 ASCII 字符
+- 不得使用 WSL 路径
 
-For nontrivial Windows work:
+### 4.6 MSYS2 路径转换排除
 
-1. Create/edit `.ps1` with native Write/Edit tools.
-2. Keep `.ps1` ASCII-only when practical.
-3. Put Chinese/non-ASCII paths into UTF-8 JSON/TXT manifests.
-4. Run from Git Bash:
+仅在必要时单次使用：
+
+```bash
+MSYS2_ARG_CONV_EXCL='*' native.exe --literal=/foo
+```
+
+不得全局设置。
+
+---
+
+## 5. PowerShell Wrapper 规则
+
+涉及 Windows 自动化、非 ASCII 路径、PowerShell 语法、Windows 工具链时，必须使用 `.ps1` wrapper。
+
+### 5.1 创建方式
+
+使用 Codex 原生工具创建脚本：
+
+- `Write`
+- `Edit`
+
+脚本尽量保持 ASCII-only。
+
+### 5.2 非 ASCII 数据传递
+
+中文路径、非 ASCII 参数、复杂参数不得直接塞进 shell argv。  
+应写入 UTF-8 JSON / TXT manifest，再由脚本读取。
+
+### 5.3 从 Bash 调用 PowerShell
+
+优先使用 `pwsh`：
 
 ```bash
 pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-Fallback only if `pwsh` is unavailable:
+如果 `pwsh` 不可用，再使用 Windows PowerShell：
 
 ```bash
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-Header for `.ps1` that touches files, Python, Unreal, Unity, MSBuild, or custom Windows tools:
+### 5.4 必须使用的 PowerShell header
+
+涉及以下任意内容的 `.ps1`，必须以该 header 开头：
+
+- 文件操作
+- Python
+- Unreal Engine
+- Unity
+- MSBuild
+- Windows 原生工具
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -131,44 +321,51 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 }
 ```
 
-## 5. MSYS2 conversion traps
+### 5.5 允许和禁止的脚本格式
 
-When Bash calls native Windows executables, MSYS2 may rewrite path-like args.
+优先使用：
 
-Avoid passing literal Linux-style options to native exe unless intended.
-
-If needed, use local one-shot exclusions only:
-
-```bash
-MSYS2_ARG_CONV_EXCL='*' native.exe --literal=/foo
-MSYS2_ENV_CONV_EXCL='VAR' VAR=/foo native.exe
+```text
+.ps1
+.py
+.js
+.json
+.txt
 ```
 
-Do not set these globally.
+禁止使用：
 
-## 6. Unicode / Chinese path rules
+```text
+.bat
+.cmd
+```
 
-Most Chinese-path failures are boundary bugs.
+---
 
-Stop and diagnose encoding first when seeing:
+## 6. 中文路径与编码规则
 
-| Symptom | Meaning | Action |
+### 6.1 常见问题处理表
+
+| 症状 | 原因 | 处理 |
 |---|---|---|
-| `\u95E8...` in a path | escaped text reused as path | decode/regenerate |
-| `????` | codepage loss | rerun through UTF-8 wrapper/manifest |
-| `é—¨æ´¾` | mojibake | regenerate from original Unicode |
-| false `FileNotFoundError` | wrong consumer/encoding | verify in the consuming environment |
-| quoted/octal Git path | Git escaping | use `-z` or `core.quotepath=false` |
+| `\\u95E8...` 出现在路径中 | 转义文本被当作路径复用 | 解码或重新生成原始 Unicode |
+| `????` | 代码页丢失 | 通过 UTF-8 wrapper / manifest 重新输出 |
+| `é—¨æ´派` | mojibake | 从原始 Unicode 重新生成 |
+| 假性 `FileNotFoundError` | 消费者或编码错误 | 在正确消费环境中重新验证 |
+| Git 路径带引号或八进制 | Git 转义 | 使用 `-z` 或 `core.quotepath=false` |
 
-For manifests:
+### 6.2 Manifest 规范
 
-- JSON: `ensure_ascii=false`
-- Read/write UTF-8 explicitly.
-- Print normal `str(path)`, not unlabeled `repr(path)`.
+写入 manifest 时必须满足：
 
-## 7. Git path output
+- `ensure_ascii=false`
+- 显式 UTF-8 读写
+- 输出 `str(path)`
+- 不输出 `repr(path)`
 
-For machine parsing:
+### 6.3 Git 机器解析命令
+
+GBK 仓库中，机器解析 Git 路径时使用：
 
 ```bash
 git -c core.quotepath=false status --porcelain=v1 -z
@@ -176,72 +373,72 @@ git -c core.quotepath=false diff --name-status -z
 git -c core.quotepath=false ls-files -z
 ```
 
-For human display:
+### 6.4 Git log / commit message
+
+为避免 GBK 仓库日志 mojibake，使用：
 
 ```bash
-git -c core.quotepath=false status --short
-git -c core.quotepath=false diff --name-only
+git -c core.quotepath=false -c i18n.logOutputEncoding=utf-8 log --oneline --max-count=20
 ```
 
-Do not change global Git config unless asked.
+不得修改全局 Git 配置。
 
-## 8. File writes
+---
 
-Follow hook write policy.
+## 7. 文件写入规则
 
-Local reinforcement:
+源码、配置、Markdown、JSON、YAML、脚本、manifest 的创建和修改，必须优先使用：
 
-- Use native Write/Edit for source, configs, markdown, JSON, YAML, scripts, manifests.
-- Do not create files through Bash heredoc, Python writes, Node writes, or `ctx_execute` unless the user explicitly asks for that path.
-- Avoid `.bat` / `.cmd` for Chinese Windows automation.
-- Prefer `.ps1`, `.py`, `.js`, UTF-8 JSON/TXT.
+- `Write`
+- `Edit`
 
-## 9. Code-task skill loading
+未经用户明确要求，不得通过以下方式创建或修改文件：
 
-For code edits/reviews/debugging/scripts/shaders/build automation:
+- Bash heredoc
+- Python write
+- Node write
+- `ctx_execute`
+- 其他 shell 重定向写入
 
-- Load `C:\Users\KSG\.codex\skills\karpathy-guidelines\SKILL.md`
-- Load `C:\Users\KSG\.codex\skills\code-comment\SKILL.md`
+---
 
-Do not dump skill contents. Apply them silently.
-If inaccessible, state once and continue.
+## 8. Skill 加载规则
 
-Use heavier workflow skills only when task clearly needs planning/research.
-Do not over-route trivial edits.
-
-## 10. Worktree safety
-
-Before edits:
+每次任务开始时，静默加载以下 skill：
 
 ```text
-check git status
-identify user changes
-avoid overwriting unrelated files
+C:\Users\KSG\.codex\skills\karpathy-guidelines\SKILL.md
+C:\Users\KSG\.codex\skills\code-comment\SKILL.md
 ```
 
-After edits:
+不得输出 skill 原文内容。
+
+如果不可访问，只说明一次，然后继续执行任务。
+
+---
+
+## 9. 统一停止条件
+
+以下任意情况发生时，必须停止，不得继续猜测：
+
+- 同一路径重定位失败 ≥2 次
+- 同一工具方向失败 ≥2 次
+- 正确消费者无法证明目标存在
+- 输出为空但无法证明搜索范围正确
+- 编码或路径域存在不确定性且无法继续验证
+
+停止时必须报告：
 
 ```text
-run targeted validation when practical
-show changed files
-report unresolved risks
+已尝试：
+- 路径：
+- 消费者：
+- 命令或工具：
+- 失败现象：
+
+未继续的原因：
+- ...
+
+需要用户提供：
+- ...
 ```
-
-Commit only when the user asked for commit or the active skill explicitly requires it.
-
-## 11. Response format
-
-Keep replies compact.
-
-Default:
-
-```text
-- Changed: ...
-- Files: ...
-- Verified: ...
-- Notes: ...
-```
-
-No long tool logs.
-No "not found" without evidence.
-No repeated guessing from CWD.
