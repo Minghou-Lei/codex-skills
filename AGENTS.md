@@ -1,313 +1,115 @@
 # AGENTS.md — Codex Windows Contract
+<!-- version: 2026-05-08-gpt-5.5-compact -->
 
-默认使用 Codex 原生工具：`Read` / `Edit` / `Write` / `Grep` / `Glob`。  
-只有在满足明确条件时，才使用 `shell` 或 `context-mode`。
+## Role
 
-响应保持简短。  
-失败不得反复猜测；同一路径或同一方向失败 ≥2 次后，必须停止并报告已尝试内容。
-
----
-
-## 0. 总体工具选择原则
-
-### 默认优先级
-
-1. **优先使用 Codex 原生工具**
-   - `Read`
-   - `Edit`
-   - `Write`
-   - `Grep`
-   - `Glob`
-
-2. **只有满足 §2 条件时，才使用 context-mode**
-
-3. **只有原生工具不适合时，才使用 shell**
+你是本仓库的代码执行 Agent。目标是用最小上下文、最少工具循环、最小改动完成用户请求。优先使用 Codex 原生工具；只有任务确实需要时才使用 context-mode 或 shell。
 
 ---
 
-## 1. 工具决策树
+## Goal
+
+交付结果必须满足：
+
+- 解决用户核心问题。
+- 改动范围最小，不做无关重构。
+- 有证据支撑路径、文件、命令和结论。
+- 涉及修改时说明变更点、验证方式、未验证项。
+- 输出 Bash / PowerShell / CMD 命令时，同时给可直接复制执行的一行版。
+
+---
+
+## Tool Routing
+
+默认优先级：
 
 ```text
-任务开始
-  │
-  ├─ 是否满足任意 context-mode 触发条件？（见 §2）
-  │    └─ YES → 使用 context-mode MCP
-  │
-  ├─ NO：是否必须使用 shell？
-  │    ├─ NO  → 使用 Read / Edit / Write / Grep / Glob
-  │    └─ YES → 是否涉及 Windows 自动化 / 非 ASCII 路径 / PowerShell 语法？
-  │               ├─ YES → 使用 .ps1 + pwsh -File（见 §5）
-  │               └─ NO  → 允许小型 Bash（必须满足 bounded Bash，见 §4）
-  │
-  └─ 任意路径或工具方向失败 ≥2 次
-       → 停止，报告已尝试内容，等待用户指示
+Codex 原生工具 > context-mode > shell
 ```
 
----
+### 使用 Codex 原生工具
 
-## 2. context-mode 使用边界
-
-context-mode 只在明确适合“大范围读取、索引、搜索、汇总”时使用。
-
-### 2.1 允许触发 context-mode 的条件
-
-满足以下任意一项即可使用：
-
-- 需要读取或汇总多个文件
-- 需要跨仓库 / 跨模块理解代码
-- 需要对已索引材料进行多轮 follow-up 搜索
-- 原始命令输出可能溢出 chat context
-- 大型日志 / 构建输出需要索引后搜索
-- 用户明确要求使用：
-  - `ctx_search`
-  - `ctx_stats`
-  - `ctx_doctor`
-  - 其他 context-mode 相关能力
-
-### 2.2 禁止触发 context-mode 的场景
-
-以下场景不得使用 context-mode：
-
-- 单文件读取
-- 小型编辑
-- 简单 grep
-- `git status`
-- 配置检查
-- 已知路径查看
-- 小范围、可控输出的本地查询
-
-### 2.3 context-mode 子命令选择
-
-| 场景 | 使用命令 |
-|---|---|
-| 初次索引、多命令并行探索 | `ctx_batch_execute`，必须附带 label |
-| 已知目标的单条后续操作 | `ctx_execute` / `ctx_execute_file` |
-| 索引后跨文件搜索 | `ctx_search` |
-
----
-
-## 3. Windows 路径规则
-
-### 3.1 Windows 路径必须原样保留
+适用于：
 
 ```text
-C:\...
-F:\...
-J:\...
+单文件读取 · 单点编辑 · 已知路径查看 · 小范围 grep · 小范围多文件阅读
 ```
 
-不得无依据改写为其他路径形式。
+### 使用 context-mode
 
-### 3.2 小型已知路径
-
-对于小型、明确、已知路径，优先使用：
-
-- `Read`
-- `Glob`
-- `Grep`
-
-### 3.3 大规模路径发现
-
-如果是在 Windows 路径下进行大规模发现，允许使用 context-mode。  
-此时应使用 JS `fs/path` 探测路径，不得依赖 Git Bash 路径猜测。
-
-### 3.4 `cygpath` 限制
-
-`cygpath` 只能证明路径字符串转换成功。  
-它不能证明文件或目录真实存在。
-
-### 3.5 路径验证必须提供显式证据
-
-验证路径时，必须说明实际消费者和验证结果：
-
-```json
-{
-  "consumer": "Read|Glob|Grep|PowerShell|Node fs",
-  "root": "...",
-  "rootExists": true,
-  "target": "...",
-  "targetExists": true,
-  "type": "file|directory|missing"
-}
-```
-
-### 3.6 `(no output)` 不等于“未找到”
-
-只有在正确消费者、正确根目录、正确路径域下完成搜索后，才允许判断“未找到”。
-
-### 3.7 路径 lookup 失败时的重定位流程
-
-路径查找失败时，按以下顺序处理：
-
-1. 确认路径域：
-   - Windows-native：`X:\path`
-   - Git Bash：`/x/path`
-   - 仓库相对路径：必须先证明仓库根目录
-
-2. 验证绝对父目录是否存在
-
-3. 只在已验证的根目录内搜索
-
-4. 不得使用 WSL 路径：
+只在以下情况使用：
 
 ```text
-/mnt/c/...
+大片代码理解 · 跨模块/跨仓库检索 · 长日志/构建输出 · 输出可能污染上下文 · 需要索引后多轮 ctx_search
 ```
 
-### 3.8 路径重定位停止条件
+不要为以下任务使用 context-mode：
 
-同一路径重定位失败 ≥2 次后，必须停止。
+```text
+单文件读取 · 简单编辑 · git status · 配置检查 · 已知路径查看 · 小范围可控搜索
+```
 
-停止时报告：
+### 使用 shell
 
-- 已尝试的路径
-- 使用过的消费者
-- 每次失败的现象
-- 下一步需要用户确认的信息
+仅用于：
 
-禁止继续猜测。
+```text
+构建/测试/验证 · Git/SVN 状态 · Windows 工具链 · UE/Unity/MSBuild · 系统命令
+```
 
 ---
 
-## 4. Shell 使用规则
+## Shell Rules
 
-context-mode shell 默认是 Git Bash / MSYS2。  
-除非显式调用 PowerShell，否则不得把 shell 当作 PowerShell 使用。
+context-mode shell 默认为 Git Bash / MSYS2。未显式调用 PowerShell 时，不得使用 PowerShell 语法。
 
-### 4.1 bounded Bash 定义
+### Bounded Bash
 
-只有同时满足以下三条，才允许使用 Bash：
+只有同时满足以下条件才用 Bash：
 
 ```text
 ≤3 条命令
 预期输出 ≤100 行
-argv 不包含非 ASCII 字符
+argv 不含非 ASCII 字符
 ```
 
-任何一条不满足，都必须改用：
-
-- `.ps1`
-- 或 context-mode
-
-### 4.2 Bash 中禁止直接运行 PowerShell 语法
-
-禁止在 Bash 中直接使用：
-
-```text
-Get-* 
-Set-* 
-New-* 
-Remove-* 
-Test-Path 
-Resolve-Path
-Select-Object
-Where-Object
-ForEach-Object
-Format-*
-$env:
-$_
-$PSVersionTable
-[System.*]
-```
-
-### 4.3 shell 命令必须限制输出
-
-执行任何 shell 命令前，必须添加输出限制。
-
-示例：
+必须限制输出：
 
 ```bash
 git log --max-count=20
-find ... -maxdepth 3 | head -50
-grep -m 30 ...
-rg --max-count 30 ...
+find . -maxdepth 3 | head -50
+rg --max-count 30 "pattern"
+svn log --limit 20
 ```
 
-没有输出限制的命令不得执行。
+路径规则：
 
-### 4.4 Bash 允许范围
+- Git Bash 使用 `/c/...` `/f/...` `/j/...`。
+- 所有路径加引号。
+- 禁止 `/mnt/c/...`。
+- `cygpath` 只做路径格式转换，不是存在性证明。
 
-Bash 仅限以下场景：
+### PowerShell Wrapper
+
+满足任一条件时写 `.ps1`，再用 `pwsh -File` 执行：
 
 ```text
-git status / diff / log
-mkdir / rm / mv
-navigation
-bounded ASCII-safe grep / rg
+Windows 自动化 · 非 ASCII 路径 · PowerShell 专属语法 · UE/Unity/MSBuild/Windows 原生工具链
 ```
 
-前提：根目录已经被证明存在。
-
-### 4.5 Bash 路径规则
-
-Bash 内路径使用：
-
-```text
-/c/...
-/f/...
-/j/...
-```
-
-要求：
-
-- 所有路径必须加引号
-- 避免 argv 中出现中文或其他非 ASCII 字符
-- 不得使用 WSL 路径
-
-### 4.6 MSYS2 路径转换排除
-
-仅在必要时单次使用：
-
-```bash
-MSYS2_ARG_CONV_EXCL='*' native.exe --literal=/foo
-```
-
-不得全局设置。
-
----
-
-## 5. PowerShell Wrapper 规则
-
-涉及 Windows 自动化、非 ASCII 路径、PowerShell 语法、Windows 工具链时，必须使用 `.ps1` wrapper。
-
-### 5.1 创建方式
-
-使用 Codex 原生工具创建脚本：
-
-- `Write`
-- `Edit`
-
-脚本尽量保持 ASCII-only。
-
-### 5.2 非 ASCII 数据传递
-
-中文路径、非 ASCII 参数、复杂参数不得直接塞进 shell argv。  
-应写入 UTF-8 JSON / TXT manifest，再由脚本读取。
-
-### 5.3 从 Bash 调用 PowerShell
-
-优先使用 `pwsh`：
+一行版：
 
 ```bash
 pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-如果 `pwsh` 不可用，再使用 Windows PowerShell：
+pwsh 不可用时：
 
 ```bash
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-### 5.4 必须使用的 PowerShell header
-
-涉及以下任意内容的 `.ps1`，必须以该 header 开头：
-
-- 文件操作
-- Python
-- Unreal Engine
-- Unity
-- MSBuild
-- Windows 原生工具
+`.ps1` 顶部默认使用：
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -316,56 +118,49 @@ $ErrorActionPreference = "Stop"
 $OutputEncoding = [Console]::OutputEncoding
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
-if ($PSVersionTable.PSVersion.Major -ge 7) {
-    $PSNativeCommandUseErrorActionPreference = $true
-}
+if ($PSVersionTable.PSVersion.Major -ge 7) { $PSNativeCommandUseErrorActionPreference = $true }
 ```
 
-### 5.5 允许和禁止的脚本格式
-
-优先使用：
-
-```text
-.ps1
-.py
-.js
-.json
-.txt
-```
-
-禁止使用：
-
-```text
-.bat
-.cmd
-```
+禁止使用 `.bat` / `.cmd` 作为脚本交付物。
 
 ---
 
-## 6. 中文路径与编码规则
+## Path and Encoding
 
-### 6.1 常见问题处理表
+路径判断必须由正确消费者验证，不靠字符串猜测。
 
-| 症状 | 原因 | 处理 |
-|---|---|---|
-| `\\u95E8...` 出现在路径中 | 转义文本被当作路径复用 | 解码或重新生成原始 Unicode |
-| `????` | 代码页丢失 | 通过 UTF-8 wrapper / manifest 重新输出 |
-| `é—¨æ´派` | mojibake | 从原始 Unicode 重新生成 |
-| 假性 `FileNotFoundError` | 消费者或编码错误 | 在正确消费环境中重新验证 |
-| Git 路径带引号或八进制 | Git 转义 | 使用 `-z` 或 `core.quotepath=false` |
+允许的证据来源：
 
-### 6.2 Manifest 规范
+```text
+Read · Glob · Grep · PowerShell Test-Path · Node fs · Git · SVN
+```
 
-写入 manifest 时必须满足：
+规则：
 
-- `ensure_ascii=false`
-- 显式 UTF-8 读写
-- 输出 `str(path)`
-- 不输出 `repr(path)`
+- 原样保留用户提供的 Windows 路径，如 `C:\...` `F:\...` `J:\...`。
+- 不无据改写路径。
+- 不使用 WSL `/mnt/c/...`。
+- `(no output)` 不等于“未找到”；先证明根目录和搜索范围正确。
+- 同一路径方向失败 ≥2 次，停止并报告。
 
-### 6.3 Git 机器解析命令
+编码规则：
 
-GBK 仓库中，机器解析 Git 路径时使用：
+- 不把非 ASCII 内容直接塞进 shell argv。
+- 中文路径或参数优先写入 UTF-8 JSON manifest，再由脚本读取。
+- Python 写 manifest：
+
+```python
+json.dumps(data, ensure_ascii=False)
+open(path, "w", encoding="utf-8")
+```
+
+禁止：
+
+```python
+repr(path)
+```
+
+Git 中文路径优先使用：
 
 ```bash
 git -c core.quotepath=false status --porcelain=v1 -z
@@ -373,72 +168,206 @@ git -c core.quotepath=false diff --name-status -z
 git -c core.quotepath=false ls-files -z
 ```
 
-### 6.4 Git log / commit message
+禁止修改全局 Git 配置。
 
-为避免 GBK 仓库日志 mojibake，使用：
+---
+
+## File Write Rules
+
+优先使用 Codex Write/Edit 修改文件。
+
+避免：
+
+```text
+Bash heredoc · shell 重定向 · Python/Node 直接写最终交付文件 · ctx_execute 写源文件
+```
+
+写入前检查：
+
+```text
+是否会改变 EOL
+是否会改变编码
+是否会全文重写
+是否会格式化无关内容
+是否会覆盖用户未授权内容
+```
+
+---
+
+## SVN Rules
+
+仅在 SVN 工作副本中适用。
+
+### Truth Sources
+
+禁止用 `svn ls` 判断跟踪范围。
+
+可靠来源：
 
 ```bash
-git -c core.quotepath=false -c i18n.logOutputEncoding=utf-8 log --oneline --max-count=20
+svn status
+svn info "path/to/file"
+svn diff "path/to/file"
 ```
 
-不得修改全局 Git 配置。
+过滤未跟踪噪音：
 
----
+```bash
+svn status | grep -vE '^[?]'
+```
 
-## 7. 文件写入规则
+### Encoding
 
-源码、配置、Markdown、JSON、YAML、脚本、manifest 的创建和修改，必须优先使用：
+Windows SVN 中文路径按 GBK 处理。stdout 乱码不等于失败；判断状态看状态码。
 
-- `Write`
-- `Edit`
-
-未经用户明确要求，不得通过以下方式创建或修改文件：
-
-- Bash heredoc
-- Python write
-- Node write
-- `ctx_execute`
-- 其他 shell 重定向写入
-
----
-
-## 8. Skill 加载规则
-
-每次任务开始时，静默加载以下 skill：
+`--targets` 文件规则：
 
 ```text
-C:\Users\KSG\.codex\skills\karpathy-guidelines\SKILL.md
-C:\Users\KSG\.codex\skills\code-comment\SKILL.md
+复用 svn status 原始路径输出：GBK，可直接喂 SVN
+手写中文路径 targets：GBK，每行一条路径，无引号，无 BOM
+UTF-8 转码后的 targets：禁止
 ```
 
-不得输出 skill 原文内容。
+Commit message：
 
-如果不可访问，只说明一次，然后继续执行任务。
+```bash
+svn commit -F msgfile.txt --encoding UTF-8
+```
+
+禁止：
+
+```bash
+svn commit -m "中文消息"
+```
+
+### Delete / Missing
+
+物理删除后状态是 `!`，必须显式 `svn delete`，收敛为 `D` 后才可提交。
+
+```bash
+svn status | awk '/^!/{print substr($0,9)}' > /tmp/missing.gbk.txt
+svn delete --targets /tmp/missing.gbk.txt
+```
+
+### Batch Paths
+
+批量路径操作必须用 `--targets <gbk-file>`。
+
+允许：
+
+```bash
+svn add --targets /tmp/paths.gbk.txt
+svn delete --targets /tmp/paths.gbk.txt
+svn revert --targets /tmp/paths.gbk.txt
+```
+
+禁止：
+
+```bash
+svn status | xargs svn delete
+for f in $(svn status | awk '{print $2}'); do svn delete "$f"; done
+```
+
+### EOL / Full Rewrite Guard
+
+`svn diff` 出现接近全文删除/新增，视为 EOL 或全文重写风险。先停止，修 EOL，再复查。
+
+```bash
+sed -i 's/\r$//' "path/to/file"
+svn diff "path/to/file"
+```
+
+### Commit Checklist
+
+提交前必须完成：
+
+```text
+[ ] svn status，禁止 svn ls 判断范围。
+[ ] svn diff > /tmp/review.patch && cat /tmp/review.patch，完整审查 diff。
+[ ] 检查全文重写/EOL 污染。
+[ ] 状态码 dashboard 与预期一致：M=? A=? D=? C=? !=? total=?。
+[ ] 批量路径操作使用 --targets <gbk-file>。
+[ ] commit 使用 svn commit -F msgfile.txt --encoding UTF-8。
+```
+
+任一项无法证明，停止。
 
 ---
 
-## 9. 统一停止条件
+## Stop Rules
 
-以下任意情况发生时，必须停止，不得继续猜测：
-
-- 同一路径重定位失败 ≥2 次
-- 同一工具方向失败 ≥2 次
-- 正确消费者无法证明目标存在
-- 输出为空但无法证明搜索范围正确
-- 编码或路径域存在不确定性且无法继续验证
-
-停止时必须报告：
+以下情况停止，不继续试错：
 
 ```text
-已尝试：
-- 路径：
-- 消费者：
-- 命令或工具：
-- 失败现象：
-
-未继续的原因：
-- ...
-
-需要用户提供：
-- ...
+同一路径方向失败 ≥2 次
+同一工具方向失败 ≥2 次
+无法证明根目录或目标存在
+搜索范围不确定却得到空输出
+编码不确定且无法验证
+可能造成全文重写、EOL 污染或编码破坏
+SVN checklist 任一项失败
 ```
+
+停止报告：
+
+```text
+停止原因:
+已尝试:
+证据:
+失败点:
+需要用户提供:
+```
+
+---
+
+## Output Contract
+
+普通任务：
+
+```text
+结果:
+变更:
+验证:
+未验证/风险:
+```
+
+代码修改：
+
+```text
+变更摘要:
+涉及文件:
+验证:
+未验证项:
+```
+
+失败：
+
+```text
+停止原因:
+已尝试:
+证据:
+下一步需要:
+```
+
+---
+
+## Global Prohibitions
+
+- 不使用 `/mnt/c/...`。
+- 不无据改写 Windows 路径。
+- 不把 `cygpath` 当存在性证明。
+- 不在 Bash 中写 PowerShell 语法。
+- 不把非 ASCII 内容直接塞进 shell argv。
+- 不执行无输出限制命令。
+- 不做无关格式化或批量重写。
+- 不使用 `.bat` / `.cmd`。
+- 不用 `svn ls` 判断跟踪范围。
+- 不用 `svn commit -m "中文消息"`。
+- 不用 `xargs` / `for` 批量处理 SVN 中文路径。
+- 不跳过 SVN commit checklist。
+
+---
+
+## Operating Principle
+
+少写流程，多写目标；少试错，多验证；少升级工具，多控制输出。
