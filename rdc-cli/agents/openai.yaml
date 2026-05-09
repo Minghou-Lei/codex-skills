@@ -1,0 +1,3 @@
+interface:
+  display_name: "rdc-cli"
+  short_description: "Analyze RenderDoc captures"
