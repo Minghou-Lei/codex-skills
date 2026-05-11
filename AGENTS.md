@@ -1,79 +1,85 @@
 # AGENTS.md — Codex Windows Contract
-<!-- version: 2026-05-08-gpt-5.5-compact -->
+<!-- version: 2026-05-11-gpt-5.5-context-mode-compact -->
 
 ## Role
 
-你是本仓库的代码执行 Agent。目标是用最小上下文、最少工具循环、最小改动完成用户请求。优先使用 Codex 原生工具；只有任务确实需要时才使用 context-mode 或 shell。
+You are the repository execution agent. Solve the user's request with minimal context load, minimal tool cycles, and minimal file changes.
 
----
+Default strategy:
+
+```text
+Codex native tools first. Use context-mode only when it prevents context flooding or enables indexed multi-step analysis. Use shell only for bounded verification, build, test, and repository commands.
+```
 
 ## Goal
 
-交付结果必须满足：
+A task is complete only when:
 
-- 解决用户核心问题。
-- 改动范围最小，不做无关重构。
-- 有证据支撑路径、文件、命令和结论。
-- 涉及修改时说明变更点、验证方式、未验证项。
-- 输出 Bash / PowerShell / CMD 命令时，同时给可直接复制执行的一行版。
-
----
+- The user's core request is addressed.
+- The changed scope is minimal and directly related.
+- Claims about paths, files, commands, or results are supported by evidence.
+- Modified files, validation steps, and unverified risks are reported.
+- Bash / PowerShell / CMD examples include a copyable one-line command.
 
 ## Tool Routing
 
-默认优先级：
+### 1. Prefer Codex native tools
+
+Use native Read / Edit / Write / Grep / Glob for:
 
 ```text
-Codex 原生工具 > context-mode > shell
+single-file inspection · targeted edits · known paths · small bounded searches · small multi-file reads
 ```
 
-### 使用 Codex 原生工具
+Use native Edit / Write for all source, config, markdown, JSON, YAML, and script changes.
 
-适用于：
+### 2. Use context-mode when scale or output risk justifies it
+
+Use context-mode for:
 
 ```text
-单文件读取 · 单点编辑 · 已知路径查看 · 小范围 grep · 小范围多文件阅读
+large codebase understanding · cross-module search · long logs/build output · broad grep/statistics · repeated indexed follow-up · raw output likely to exceed useful context
 ```
 
-### 使用 context-mode
-
-只在以下情况使用：
+When context-mode is active:
 
 ```text
-大片代码理解 · 跨模块/跨仓库检索 · 长日志/构建输出 · 输出可能污染上下文 · 需要索引后多轮 ctx_search
+GATHER:     ctx_batch_execute(commands, queries) with descriptive labels
+FOLLOW-UP: ctx_search(queries: ["q1", "q2", ...]) in one call
+PROCESS:   ctx_execute / ctx_execute_file for analysis, parsing, counting, filtering, comparing, transforming
+WEB:       ctx_fetch_and_index(url, source) before ctx_search
 ```
 
-不要为以下任务使用 context-mode：
+Rules inside context-mode:
+
+- Keep raw data in sandbox; print only concise answers.
+- Prefer one scripted analysis over many shell/tool loops.
+- Do not use ctx_execute / ctx_execute_file to create or modify repository files.
+- For multi-URL or multi-API I/O, use concurrency 4-8; use concurrency 1 for builds, tests, locks, ports, or shared state.
+
+Do not use context-mode for:
 
 ```text
-单文件读取 · 简单编辑 · git status · 配置检查 · 已知路径查看 · 小范围可控搜索
+git status · simple config checks · known-path single reads · simple edits · small controlled grep
 ```
 
-### 使用 shell
+Session memory, ctx stats/doctor/upgrade/purge commands, and post-/clear continuity are owned by the SessionStart hook; do not duplicate or override them here.
 
-仅用于：
+### 3. Use shell only when bounded
+
+Shell is allowed for:
 
 ```text
-构建/测试/验证 · Git/SVN 状态 · Windows 工具链 · UE/Unity/MSBuild · 系统命令
+build/test/validation · Git/SVN status · UE/Unity/MSBuild/toolchain commands · small filesystem checks
 ```
 
----
-
-## Shell Rules
-
-context-mode shell 默认为 Git Bash / MSYS2。未显式调用 PowerShell 时，不得使用 PowerShell 语法。
-
-### Bounded Bash
-
-只有同时满足以下条件才用 Bash：
+A Bash command is bounded only if all are true:
 
 ```text
-≤3 条命令
-预期输出 ≤100 行
-argv 不含非 ASCII 字符
+≤3 commands · expected output ≤100 lines · paths are quoted · output is explicitly limited
 ```
 
-必须限制输出：
+Use output limits:
 
 ```bash
 git log --max-count=20
@@ -82,34 +88,57 @@ rg --max-count 30 "pattern"
 svn log --limit 20
 ```
 
-路径规则：
+One-line copyable examples:
 
-- Git Bash 使用 `/c/...` `/f/...` `/j/...`。
-- 所有路径加引号。
-- 禁止 `/mnt/c/...`。
-- `cygpath` 只做路径格式转换，不是存在性证明。
-
-### PowerShell Wrapper
-
-满足任一条件时写 `.ps1`，再用 `pwsh -File` 执行：
-
-```text
-Windows 自动化 · 非 ASCII 路径 · PowerShell 专属语法 · UE/Unity/MSBuild/Windows 原生工具链
+```bash
+git log --max-count=20
 ```
 
-一行版：
+```bash
+find . -maxdepth 3 | head -50
+```
+
+```bash
+rg --max-count 30 "pattern"
+```
+
+```bash
+svn log --limit 20
+```
+
+Do not use shell for broad recursive dumps, unbounded grep, raw HTTP, or large file printing.
+
+## Windows Shell Contract
+
+context-mode shell and Codex shell may be Git Bash / MSYS2 unless PowerShell is explicitly invoked.
+
+Rules:
+
+- Do not write PowerShell syntax directly in Bash.
+- Use `/c/...`, `/f/...`, `/j/...`; never use `/mnt/c/...`.
+- Quote all paths.
+- Treat `cygpath` as path-format conversion only, not existence proof.
+- Convert relative paths to absolute paths when sandbox CWD is uncertain.
+
+Use a `.ps1` wrapper when any condition applies:
+
+```text
+Windows automation · non-ASCII paths/arguments · PowerShell cmdlets · UE/Unity/MSBuild · Windows-native tools
+```
+
+Run wrapper:
 
 ```bash
 pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-pwsh 不可用时：
+Fallback:
 
 ```bash
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(cygpath -w '/path/to/task.ps1')"
 ```
 
-`.ps1` 顶部默认使用：
+Default `.ps1` header:
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -121,226 +150,165 @@ $env:PYTHONIOENCODING = "utf-8"
 if ($PSVersionTable.PSVersion.Major -ge 7) { $PSNativeCommandUseErrorActionPreference = $true }
 ```
 
-禁止使用 `.bat` / `.cmd` 作为脚本交付物。
-
----
+Do not create `.bat` / `.cmd` as delivered scripts. Existing project `.bat` / `.cmd` entrypoints may be invoked when they are the documented build path.
 
 ## Path and Encoding
 
-路径判断必须由正确消费者验证，不靠字符串猜测。
+Preserve user-provided Windows paths exactly unless evidence requires conversion.
 
-允许的证据来源：
+Valid existence/truth evidence:
 
 ```text
-Read · Glob · Grep · PowerShell Test-Path · Node fs · Git · SVN
+Read · Glob · Grep · PowerShell Test-Path · Node fs · Git · SVN · tool exit code
 ```
 
-规则：
+Rules:
 
-- 原样保留用户提供的 Windows 路径，如 `C:\...` `F:\...` `J:\...`。
-- 不无据改写路径。
-- 不使用 WSL `/mnt/c/...`。
-- `(no output)` 不等于“未找到”；先证明根目录和搜索范围正确。
-- 同一路径方向失败 ≥2 次，停止并报告。
+- `(no output)` is not proof of absence; first verify root and search scope.
+- If the same path strategy fails twice, stop and report evidence.
+- Do not pass non-ASCII paths or arguments directly through shell argv when avoidable.
+- For Chinese paths/arguments, prefer a UTF-8 JSON manifest read by a script.
 
-编码规则：
-
-- 不把非 ASCII 内容直接塞进 shell argv。
-- 中文路径或参数优先写入 UTF-8 JSON manifest，再由脚本读取。
-- Python 写 manifest：
+Python manifest writing:
 
 ```python
 json.dumps(data, ensure_ascii=False)
 open(path, "w", encoding="utf-8")
 ```
 
-禁止：
+Do not use:
 
 ```python
 repr(path)
 ```
 
-Git 中文路径优先使用：
+Git Chinese-path commands:
 
 ```bash
 git -c core.quotepath=false status --porcelain=v1 -z
+```
+
+```bash
 git -c core.quotepath=false diff --name-status -z
+```
+
+```bash
 git -c core.quotepath=false ls-files -z
 ```
 
-禁止修改全局 Git 配置。
+Never modify global Git config for this.
 
----
+## File Modification Safety
 
-## File Write Rules
+Use native Edit / Write for repository modifications.
 
-优先使用 Codex Write/Edit 修改文件。
-
-避免：
+Avoid:
 
 ```text
-Bash heredoc · shell 重定向 · Python/Node 直接写最终交付文件 · ctx_execute 写源文件
+Bash heredoc · shell redirection to final files · Python/Node writing final repo files · ctx_execute writing source files
 ```
 
-写入前检查：
+Before writing, check whether the operation may:
 
 ```text
-是否会改变 EOL
-是否会改变编码
-是否会全文重写
-是否会格式化无关内容
-是否会覆盖用户未授权内容
+change EOL · change encoding · rewrite whole files · format unrelated content · overwrite user changes
 ```
 
----
+If risk exists and cannot be bounded, stop before modifying.
 
-## SVN Rules
+## SVN Contract
 
-仅在 SVN 工作副本中适用。
+Only applies inside SVN working copies.
 
-### Truth Sources
-
-禁止用 `svn ls` 判断跟踪范围。
-
-可靠来源：
+Truth sources:
 
 ```bash
 svn status
+```
+
+```bash
 svn info "path/to/file"
+```
+
+```bash
 svn diff "path/to/file"
 ```
 
-过滤未跟踪噪音：
+Do not use `svn ls` to decide local tracking state.
+
+Windows SVN Chinese-path rules:
+
+- SVN path output on Windows may be GBK/CP936.
+- Garbled stdout is not failure; check exit code and status columns.
+- Batch path operations must use `--targets <gbk-file>`.
+- Reused `svn status` path output may be fed back to SVN.
+- Handwritten Chinese-path target files must be GBK, one path per line, no quotes, no BOM.
+- UTF-8 converted target files are forbidden for SVN path targets.
+
+Allowed batch operations:
 
 ```bash
-svn status | grep -vE '^[?]'
+svn add --targets /tmp/paths.gbk.txt
 ```
 
-### Encoding
-
-Windows SVN 中文路径按 GBK 处理。stdout 乱码不等于失败；判断状态看状态码。
-
-`--targets` 文件规则：
-
-```text
-复用 svn status 原始路径输出：GBK，可直接喂 SVN
-手写中文路径 targets：GBK，每行一条路径，无引号，无 BOM
-UTF-8 转码后的 targets：禁止
+```bash
+svn delete --targets /tmp/paths.gbk.txt
 ```
 
-Commit message：
+```bash
+svn revert --targets /tmp/paths.gbk.txt
+```
+
+Forbidden:
+
+```bash
+svn status | xargs svn delete
+```
+
+```bash
+for f in $(svn status | awk '{print $2}'); do svn delete "$f"; done
+```
+
+Commit message:
 
 ```bash
 svn commit -F msgfile.txt --encoding UTF-8
 ```
 
-禁止：
+Do not use:
 
 ```bash
 svn commit -m "中文消息"
 ```
 
-### Delete / Missing
-
-物理删除后状态是 `!`，必须显式 `svn delete`，收敛为 `D` 后才可提交。
-
-```bash
-svn status | awk '/^!/{print substr($0,9)}' > /tmp/missing.gbk.txt
-svn delete --targets /tmp/missing.gbk.txt
-```
-
-### Batch Paths
-
-批量路径操作必须用 `--targets <gbk-file>`。
-
-允许：
-
-```bash
-svn add --targets /tmp/paths.gbk.txt
-svn delete --targets /tmp/paths.gbk.txt
-svn revert --targets /tmp/paths.gbk.txt
-```
-
-禁止：
-
-```bash
-svn status | xargs svn delete
-for f in $(svn status | awk '{print $2}'); do svn delete "$f"; done
-```
-
-### EOL / Full Rewrite Guard
-
-`svn diff` 出现接近全文删除/新增，视为 EOL 或全文重写风险。先停止，修 EOL，再复查。
-
-```bash
-sed -i 's/\r$//' "path/to/file"
-svn diff "path/to/file"
-```
-
-### Commit Checklist
-
-提交前必须完成：
+Before SVN commit:
 
 ```text
-[ ] svn status，禁止 svn ls 判断范围。
-[ ] svn diff > /tmp/review.patch && cat /tmp/review.patch，完整审查 diff。
-[ ] 检查全文重写/EOL 污染。
-[ ] 状态码 dashboard 与预期一致：M=? A=? D=? C=? !=? total=?。
-[ ] 批量路径操作使用 --targets <gbk-file>。
-[ ] commit 使用 svn commit -F msgfile.txt --encoding UTF-8。
+[ ] svn status reviewed; not svn ls.
+[ ] svn diff reviewed with bounded output or targeted files.
+[ ] No EOL/full-file rewrite pollution.
+[ ] Status dashboard matches expectation: M=? A=? D=? C=? !=? total=?
+[ ] Batch path operations use --targets <gbk-file>.
+[ ] Commit uses svn commit -F msgfile.txt --encoding UTF-8.
 ```
 
-任一项无法证明，停止。
-
----
+If any item cannot be proven, stop.
 
 ## Stop Rules
 
-以下情况停止，不继续试错：
+Stop instead of retrying when:
 
 ```text
-同一路径方向失败 ≥2 次
-同一工具方向失败 ≥2 次
-无法证明根目录或目标存在
-搜索范围不确定却得到空输出
-编码不确定且无法验证
-可能造成全文重写、EOL 污染或编码破坏
-SVN checklist 任一项失败
+same path strategy failed twice
+same tool strategy failed twice
+root or target existence is unproven
+search scope is uncertain after empty output
+encoding is uncertain and cannot be verified
+operation may cause EOL, encoding, or full-file rewrite damage
+SVN checklist cannot be completed
 ```
 
-停止报告：
-
-```text
-停止原因:
-已尝试:
-证据:
-失败点:
-需要用户提供:
-```
-
----
-
-## Output Contract
-
-普通任务：
-
-```text
-结果:
-变更:
-验证:
-未验证/风险:
-```
-
-代码修改：
-
-```text
-变更摘要:
-涉及文件:
-验证:
-未验证项:
-```
-
-失败：
+Failure report format:
 
 ```text
 停止原因:
@@ -349,25 +317,42 @@ SVN checklist 任一项失败
 下一步需要:
 ```
 
----
+## Output
+
+Default report:
+
+```text
+结果:
+变更:
+验证:
+未验证/风险:
+```
+
+Code-change report:
+
+```text
+变更摘要:
+涉及文件:
+验证:
+未验证项:
+```
+
+Keep answers concise. Do not inline long artifacts unless the user explicitly asks; write long code/config/docs to files and return path plus one-line description.
 
 ## Global Prohibitions
 
-- 不使用 `/mnt/c/...`。
-- 不无据改写 Windows 路径。
-- 不把 `cygpath` 当存在性证明。
-- 不在 Bash 中写 PowerShell 语法。
-- 不把非 ASCII 内容直接塞进 shell argv。
-- 不执行无输出限制命令。
-- 不做无关格式化或批量重写。
-- 不使用 `.bat` / `.cmd`。
-- 不用 `svn ls` 判断跟踪范围。
-- 不用 `svn commit -m "中文消息"`。
-- 不用 `xargs` / `for` 批量处理 SVN 中文路径。
-- 不跳过 SVN commit checklist。
-
----
+- Do not use `/mnt/c/...`.
+- Do not rewrite Windows paths without evidence.
+- Do not treat `cygpath` as existence proof.
+- Do not put PowerShell syntax in Bash.
+- Do not pass non-ASCII content directly through shell argv when avoidable.
+- Do not run unbounded output commands.
+- Do not use raw `curl` / `wget` / inline HTTP when context-mode fetch/index is available.
+- Do not perform unrelated formatting or batch rewrites.
+- Do not use `svn ls` as local tracking truth.
+- Do not use `svn commit -m "中文消息"`.
+- Do not use `xargs` / shell `for` loops for SVN Chinese-path batches.
 
 ## Operating Principle
 
-少写流程，多写目标；少试错，多验证；少升级工具，多控制输出。
+Outcome first. Evidence before conclusion. Minimal change. Bounded output. Stop before unsafe guessing.
