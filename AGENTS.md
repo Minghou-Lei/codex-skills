@@ -72,12 +72,51 @@ Unless the user explicitly asks for a plan, asks a question about the code, is b
 ## 5. Tool routing and persistence
 
 <tool_routing>
-Native Codex tools (Read, Edit, Write, Glob, Grep) handle file read, targeted edit, known-path inspection, bounded grep, multi-file read, and file creation.
+Native Codex tools (Read, Edit, Write, Glob, Grep) handle file read, targeted edit, known-path inspection, multi-file read, and file creation.
+
+Code search has two complementary paths — choose by what you are looking for:
+- Semantic search (what code does, similar implementations, vague descriptions) → `semble` (see <code_search>).
+- Literal search (exact strings, symbol definitions, error messages, regex patterns, exhaustive matches) → native Grep / `rg`.
 
 Shell handles build, test, run, VCS state, environment and toolchain queries, and bounded system commands.
 
 Prefer native tools first; reach for shell when shell is what the task actually needs.
 </tool_routing>
+
+<code_search>
+`semble` is a semantic code search tool. Use it as the default first step when locating code by behavior, intent, or similarity rather than by exact text.
+
+Reach for `semble search` when:
+- the target is described by what it does ("authentication flow", "tile light culling", "constant buffer upload path"),
+- the symbol or API name is uncertain or may differ across the codebase,
+- exploring an unfamiliar repository to find the right entry point.
+
+Reach for `semble find-related` when:
+- a promising hit has already been located, and you want similar implementations elsewhere in the codebase.
+
+Reach for Grep / `rg` instead when:
+- the exact string, identifier, error message, or regex is known,
+- you need exhaustive matches (every call site, every TODO, every occurrence of a macro),
+- confirming a precise rename or quick existence check.
+
+Commands:
+```bash
+semble search "tile light culling" ./my-project
+semble search "SetPipelineState" ./my-project
+semble search "upload constants to gpu" ./my-project --top-k 10
+semble find-related src/RenderGraph.cpp 142 ./my-project
+```
+
+`path` defaults to the current directory when omitted; git URLs are accepted. If `semble` is not on `$PATH`, substitute `uvx --from "semble[mcp]" semble` in place of `semble`.
+
+Default flow:
+1. Start with `semble search` to surface relevant chunks and their `file_path` / `line`.
+2. Read full files only when the returned chunk lacks enough context.
+3. When a hit looks promising and you want related code, follow up with `semble find-related` using that hit's `file_path` and `line`.
+4. Drop to Grep / `rg` for exact-match confirmation, exhaustive sweeps, or when semantic search returns nothing relevant.
+
+Semantic and literal search are complementary, not interchangeable. If one returns nothing useful, the other is the natural fallback (see <empty_result_recovery>).
+</code_search>
 
 <tool_persistence_rules>
 - Use tools whenever they materially improve correctness, completeness, or grounding.
@@ -101,7 +140,7 @@ Prefer native tools first; reach for shell when shell is what the task actually 
 <empty_result_recovery>
 If a lookup returns empty, partial, or suspiciously narrow results:
 - do not immediately conclude that no results exist,
-- try one or two fallback strategies (alternate query wording, broader filters, a prerequisite lookup, or an alternate source or tool),
+- try one or two fallback strategies — alternate query wording, broader filters, a prerequisite lookup, or switching between semantic (`semble`) and literal (`rg` / Grep) search,
 - only then report "not found" along with what was tried.
 </empty_result_recovery>
 
@@ -355,109 +394,3 @@ If the host runtime exposes assistant-item `phase` values:
 ## 15. Operating principle
 
 Outcome first. Evidence before confidence. Verify before claiming completion. Small reversible steps. Adapt to the project in front of you. Stop before guessing when path, encoding, or destructive-action safety cannot be proven.
-
----
-
-## Appendix A. context-mode Routing Rules
-
-The following routing rules are appended for global Codex integration with `context-mode`. They do not replace the contract above; they constrain how high-volume analysis and retrieval should be routed so raw tool output does not flood the context window.
-
-# context-mode — MANDATORY routing rules
-
-context-mode MCP tools available. Rules protect context window from flooding. One unrouted command dumps 56 KB into context. Codex CLI hooks provide runtime enforcement when `[features].hooks = true`; these instructions remain mandatory model-side enforcement. Follow strictly.
-
-## Think in Code — MANDATORY
-
-Analyze/count/filter/compare/search/parse/transform data: **write code** via `ctx_execute(language, code)`, `console.log()` only the answer. Do NOT read raw data into context. PROGRAM the analysis, not COMPUTE it. Pure JavaScript — Node.js built-ins only (`fs`, `path`, `child_process`). `try/catch`, handle `null`/`undefined`. One script replaces ten tool calls.
-
-## BLOCKED — do NOT use
-
-### curl / wget — FORBIDDEN
-Do NOT use `curl`/`wget` in shell. Dumps raw HTTP into context.
-Use: `ctx_fetch_and_index(url, source)` or `ctx_execute(language: "javascript", code: "const r = await fetch(...)")`
-
-### Inline HTTP — FORBIDDEN
-No `node -e "fetch(..."`, `python -c "requests.get(..."`. Bypasses sandbox.
-Use: `ctx_execute(language, code)` — only stdout enters context
-
-### Direct web fetching — FORBIDDEN
-Raw HTML can exceed 100 KB.
-Use: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)`
-
-## REDIRECTED — use sandbox
-
-### Shell (>20 lines output)
-Shell ONLY for: `git`, `mkdir`, `rm`, `mv`, `cd`, `ls`, `npm install`, `pip install`.
-Otherwise: `ctx_batch_execute(commands, queries)` or `ctx_execute(language: "shell", code: "...")`
-
-### File reading (for analysis)
-Reading to **edit** → reading correct. Reading to **analyze/explore/summarize** → `ctx_execute_file(path, language, code)`.
-
-### grep / search (large results)
-Use `ctx_execute(language: "shell", code: "grep ...")` in sandbox.
-
-## Tool selection
-
-0. **MEMORY**: `ctx_search(sort: "timeline")` — after resume, check prior context before asking user.
-1. **GATHER**: `ctx_batch_execute(commands, queries)` — runs all commands, auto-indexes, returns search. ONE call replaces 30+. Each command: `{label: "header", command: "..."}`
-2. **FOLLOW-UP**: `ctx_search(queries: ["q1", "q2", ...])` — all questions as array, ONE call (default relevance mode).
-3. **PROCESSING**: `ctx_execute(language, code)` | `ctx_execute_file(path, language, code)` — sandbox, only stdout enters context.
-4. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — raw HTML never enters context.
-5. **INDEX**: `ctx_index(content, source)` — store in FTS5 for later search.
-
-## Parallel I/O batches
-
-For multi-URL fetches or multi-API calls, **always** include `concurrency: N` (1-8):
-
-- `ctx_batch_execute(commands: [3+ network commands], concurrency: 5)` — gh, curl, dig, docker inspect, multi-region cloud queries
-- `ctx_fetch_and_index(requests: [{url, source}, ...], concurrency: 5)` — multi-URL batch fetch
-
-**Use concurrency 4-8** for I/O-bound work (network calls, API queries). **Keep concurrency 1** for CPU-bound (npm test, build, lint) or commands sharing state (ports, lock files, same-repo writes).
-
-GitHub API rate-limit: cap at 4 for `gh` calls.
-
-## Output
-
-Write artifacts to FILES — never inline. Return: file path + 1-line description.
-Descriptive source labels for `ctx_search(source: "label")`.
-
-## Session Continuity
-
-Skills, roles, and decisions persist for the entire session. Do not abandon them as the conversation grows.
-
-## Memory
-
-Session history is persistent and searchable. On resume, search BEFORE asking the user:
-
-| Need | Command |
-|------|---------|
-| What were we working on? | `ctx_search(queries: ["summary"], source: "compaction", sort: "timeline")` |
-| What did we decide? | `ctx_search(queries: ["decision"], source: "decision", sort: "timeline")` |
-| What NOT to repeat? | `ctx_search(queries: ["rejected"], source: "rejected-approach")` |
-| What constraints exist? | `ctx_search(queries: ["constraint"], source: "constraint")` |
-
-Note: user-prompt history not available.
-
-DO NOT ask "what were we working on?" — SEARCH FIRST.
-If search returns 0 results, proceed as a fresh session.
-
-## ctx commands
-
-| Command | Action |
-|---------|--------|
-| `ctx stats` | Call `stats` MCP tool, display full output verbatim |
-| `ctx doctor` | Call `doctor` MCP tool, run returned shell command, display as checklist |
-| `ctx upgrade` | Call `upgrade` MCP tool, run returned shell command, display as checklist |
-| `ctx purge` | Call `purge` MCP tool with confirm: true. Warns before wiping knowledge base. |
-
-After /clear or /compact: knowledge base and session stats preserved. Use `ctx purge` to start fresh.
-
-## Windows notes
-
-**PowerShell cmdlets** — Sandbox uses bash. PowerShell cmdlets (`Format-List`, `Get-Culture`, etc.) fail with `command not found`. Wrap with `pwsh -NoProfile -Command "..."`.
-
-**Relative paths** — Sandbox CWD is temp dir, not project root. Convert to absolute paths. Ask user to confirm if unknown.
-
-**Windows drive letters** — Sandbox runs Git Bash / MSYS2. `X:\path` → `/x/path` (lowercase, no `/mnt/`). Never emit `/mnt/<letter>/`.
-
-**Quote paths** — Spaces in paths cause splits. Always double-quote: `rg "symbol" "$REPO_ROOT/some dir/Source"`.
