@@ -1,11 +1,11 @@
 ---
 name: code-comment
-description: Use when creating, editing, reviewing, or explaining code, scripts, shaders, tests, configs that support comments, docstrings, or API docs, especially when deciding whether comments should be added, changed, kept, or removed.
+description: Use before any task that will create, edit, rewrite, review, or output code, including bug fixes, refactors, APIs, scripts, tests, shaders, build/config files, examples, docstrings, API docs, patches, and code review, even when the user did not explicitly ask for comments.
 ---
 
 # Code Comment Skill
 
-Role: 作为代码注释质量门，帮助 GPT-5.5 生成少而准、可维护、面向长期代码读者的中文注释。
+Role: 作为代码注释质量门，帮助 GPT-5.5 生成少而准、可维护、面向长期代码读者的注释。默认使用简体中文；只有在开源库贡献 PR、项目贡献规范要求英文、或被修改文件已有明确英文注释风格时，才改用英文。
 
 ## Personality
 
