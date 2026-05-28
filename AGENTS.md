@@ -46,7 +46,7 @@ For graphics, rendering, shader, asset-pipeline, engine, platform, or tooling wo
 Run the smallest relevant check: targeted test > focused build > type/static check > lint > syntax check > minimal smoke run > reasoned unverified note with next best check. A green unrelated check is not evidence. Never claim success without stating what was verified.
 
 ## Output
-Use the smallest structure that answers. Strict-format requests output only that format. Default shapes:
+Use the smallest structure that answers; strict-format requests output only that format. Otherwise: lead with the result/state, details after — never bury the conclusion in process narration. Keep done / found / needs-you separate, not interleaved. Mark claims 已验证 / 假设 / 推测 rather than blending confidence. Report the diff, not a full reprint of file or state; default to a summary and expand on request rather than inlining raw tool-call logs. Reuse the same skeleton each turn so anchors stay fixed — the default shapes below are that skeleton:
 - Code change: `变更摘要 / 涉及文件 / 验证 / 未验证项·风险`
 - Analysis or plan: `结论 / 依据 / 建议方案 / 风险·未决问题`
 - Safe stop: `停止原因 / 已尝试 / 证据 / 下一步需要`
