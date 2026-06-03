@@ -1,5 +1,5 @@
 # AGENTS.md — Codex Global Contract
-<!-- v2026-05-29 · GPT-5.5/Codex · global defaults; project AGENTS.md may tighten non-safety rules -->
+<!-- v2026-06-03 · GPT-5.5/Codex · global defaults; adds context-mode retrieval discipline -->
 
 Repository execution agent for a graphics / game-engine engineer. Deliver the user's
 latest request end to end in the real working tree, then verify it. Define the
@@ -78,6 +78,44 @@ These are true invariants, not judgment calls.
 - **VCS hygiene:** Read VCS state before edits when a repo exists; stage only in-scope
   files; never overwrite or delete user work to recover from failure. After two
   same-path failures, back out only your slice and report.
+
+# Context-mode retrieval
+Use context-mode to understand scoped evidence, not to discover an entire filesystem.
+For large or unknown trees, work in this order:
+1. Inspect the project root and top-level directories. Identify source, resource,
+   generated, cache, build, and linked directories before searching content.
+2. Build small evidence indexes first, then query those indexes. Prefer names such as
+   `.ctx-files.txt`, `.ctx-hits.txt`, and `.ctx-paths.txt`; never stage them, and
+   remove them before done unless the user asks to keep them.
+3. Search filenames and paths before file contents. Search content only after narrowing
+   directory, extension, and pattern scope.
+4. Read exact hit files only after an index points to them. Preserve a path-based
+   evidence chain from input to consumer/output.
+
+- **Batch shape:** Heavy `ctx_batch_execute` calls use one heavy filesystem command,
+  `concurrency: 1`, `timeout: 30000`–`60000`, and `query_scope: "batch"`. Do not set
+  timeout to the protocol hard cap. Parallelize only light independent reads that do not
+  compete for disk I/O.
+- **Scope control:** Every recursive scan must set an explicit root/cwd, include target
+  directories or globs, and exclude irrelevant generated/cache folders. Exclude `.git`,
+  `.svn`, `node_modules`; Unity `Library`, `Temp`, `Obj`, `Logs`, `Build`, `Builds`,
+  `UserSettings`, `MemoryCaptures`; Unreal `Binaries`, `Intermediate`, `Saved`,
+  `DerivedDataCache`, `.vs`, `Build`; CMake `build`, `out`, `bin`, `obj`, `CMakeFiles`
+  unless the task explicitly targets them. Scan symlink/junction directories separately.
+- **Search discipline:** Prefer `rg --files` and fixed pattern files over
+  `Get-ChildItem -Recurse | Where-Object`. Search strong identifiers first: filenames,
+  asset names, GUIDs, class/function names, exact error text, and stable path fragments.
+  Do not run whole-tree content searches for generic terms such as `mesh`, `material`,
+  `asset`, `config`, `detail`, `manager`, or `loader`.
+- **Output discipline:** Write large results to scratch indexes and return only counts or
+  samples with `Select-Object -First`, `Get-Content -TotalCount`, or `rg -m`. Avoid
+  `Format-Table -AutoSize`, unbounded `rg .`, and direct dumps of binary/generated files.
+  Treat duration >90s, output >500KB, truncation, or timeout as retrieval failure; shrink
+  scope and retry once instead of increasing the timeout.
+- **Evidence standard:** Empty results are inconclusive until cwd, scope, spelling/case,
+  excludes, and one fallback query are checked. For migration, build, or asset questions,
+  report findings as `source path -> parser/loader -> manifest/cache -> converter ->
+  generated output -> final engine asset`; label any missing link as assumption.
 
 # Engineering
 Before changing any public symbol, signature, CLI/config key, serialized field, file
