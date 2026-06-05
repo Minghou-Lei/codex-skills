@@ -1,0 +1,4 @@
+interface:
+  display_name: "SVN Subversion"
+  short_description: "Safe SVN workflows for Windows and game repos"
+  default_prompt: "Use $svn-subversion to inspect this working copy and prepare a safe SVN commit."

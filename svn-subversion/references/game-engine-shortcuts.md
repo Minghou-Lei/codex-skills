@@ -33,7 +33,7 @@ svn status -u | tail -3
 ## PowerShell (Windows native)
 
 > Set UTF-8 first (`chcp 65001`, `$OutputEncoding = [System.Text.Encoding]::UTF8`)
-> — see [references/encoding-and-daily-ops.md](encoding-and-daily-ops.md).
+> — see [encoding-and-paths.md](encoding-and-paths.md).
 
 ```powershell
 # Modified C++ files
