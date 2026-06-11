@@ -140,6 +140,19 @@ result = a + b  # 将 a 和 b 相加   ← 废话
 return output   # 返回输出         ← 废话
 ```
 
+### 行级锚点：短注释贴行尾，长解释放行上
+
+```python
+chunk_size = 1024  # 1024 行/块：实测内存峰值与吞吐的平衡点（讨论见 Issue #301）
+type_id = flags & 0x0F  # 低 4 位 = 材质类型 ID，与 C++ 侧枚举严格同步
+
+# 复合条件的领域含义放行上：仅重试"可恢复且未超时间预算"的请求
+if err.retryable and elapsed < BUDGET_SECONDS:
+    retry()
+```
+
+行尾复述语法是废话；行尾写值语义、出处、改动影响是规范要求的锚点。区别在信息增量。
+
 ## TODO 格式
 
 ```python

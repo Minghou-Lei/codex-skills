@@ -131,6 +131,16 @@ count++;          // count 加 1     ← 废话
 return value;     // 返回 value     ← 废话
 ```
 
+### 行级锚点：短注释贴行尾，长解释放行上
+
+```csharp
+material.SetFloat(DepthBiasId, 0.005f);  // 5e-3 = Shadow Acne 消除经验值，再大出现 Peter-Panning
+int typeId = flags & 0x0F;  // 低 4 位 = 材质类型 ID，与 Shader 侧宏定义严格同步
+if (++retryCount > 3) return false;  // 3 次封顶：单次超时 5s，再多用户感知为卡死
+```
+
+行尾复述语法是废话；行尾写值语义、出处、改动影响是规范要求的锚点。区别在信息增量。
+
 ## 异步方法注释
 
 ```csharp

@@ -25,13 +25,14 @@
  * <p><b>线程安全：</b>非线程安全，所有方法须在渲染线程调用。<br>
  * <b>生命周期：</b>单次使用，执行完成后不可复用。
  *
- * @author MinghouLei
  * @since 2.0.0
  * @see IRenderPass
  * @see RenderContext
  */
 public class RenderPassScheduler {
 ```
+
+`@author` 仅在项目规范明确要求时写（VCS 已记录作者）；`@since` 保留——它记录 API 进入版本，对公开库的调用方有真实价值。
 
 ## 方法注释
 
@@ -120,6 +121,16 @@ if (isAdreno6xx()) {
 i++;              // 自增 i          ← 废话
 return result;    // 返回结果        ← 废话
 ```
+
+### 行级锚点：短注释贴行尾，长解释放行上
+
+```java
+buffer.limit(HEADER_BYTES + payloadLen);  // 包头 16 字节 + 负载，与协议 v3 文档 §2.1 对齐
+int typeId = flags & 0x0F;  // 低 4 位 = 材质类型 ID，与 native 侧枚举严格同步
+if (++retryCount > 3) return false;  // 3 次封顶：单次超时 5s，再多用户感知为卡死
+```
+
+行尾复述语法是废话；行尾写值语义、出处、改动影响是规范要求的锚点。区别在信息增量。
 
 ## 接口注释
 

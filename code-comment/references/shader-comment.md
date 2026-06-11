@@ -23,9 +23,11 @@
 //   SceneColor (R11G11B10F) - 线性空间 HDR 颜色（不含 Tonemapping）
 //
 // Shader Model: SM 5.0+
-// 作者: MinghouLei  日期: 2025-01-15
 //=============================================================================
 ```
+
+作者/日期字段仅在项目规范明确要求时添加：VCS 已记录作者与日期，这类字段极易过时。
+输入/输出 RT 清单与 Shader Model 声明不可省——它们是 VCS 给不了的契约信息。
 
 ## 函数注释（Doxygen 兼容格式）
 
@@ -136,6 +138,16 @@ float4 PS_DeferredLighting(VSOutput input) : SV_Target
     return float4(radiance, 1.0);
 }
 ```
+
+## 行级锚点注释：短注释贴行尾，长解释放行上
+
+```hlsl
+float bias = 0.005f;  // 5e-3 = Shadow Acne 消除经验值，再大会出现 Peter-Panning
+uint typeId = packedData & 0x0F;  // 低 4 位 = 材质类型 ID，与 C++ 侧 GBufferLayout 严格同步
+color *= rcp(1.0 + lum);  // Reinhard 简化版 tone mapping，防止 HDR 溢出到 LDR RT
+```
+
+行尾复述语法是废话；行尾写值语义、出处、改动影响是规范要求的锚点。区别在信息增量。
 
 ## WORKAROUND / 驱动兼容注释
 

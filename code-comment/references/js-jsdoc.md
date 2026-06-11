@@ -15,13 +15,14 @@
  * @description 渲染图调度器的 TypeScript 实现，负责 Pass 依赖解析与执行排序。
  *
  * @module  RenderGraph
- * @author  MinghouLei
  *
  * @remarks
  * 本模块不依赖任何 WebGL/WebGPU 的具体实现，通过 IRHIBackend 接口抽象底层 API。
  * 仅在主线程使用，不支持 Web Worker 调用。
  */
 ```
+
+`@author` 仅在项目规范明确要求时添加（VCS 已记录作者）；`@deprecated` 中的版本号保留——迁移信息对调用方有真实价值。
 
 ## 函数注释
 
@@ -164,6 +165,16 @@ const alignedOffset = Math.ceil(rawOffset / 256) * 256;
 i++;                  // i 加 1        ← 废话
 return result;        // 返回结果      ← 废话
 ```
+
+### 行级锚点：短注释贴行尾，长解释放行上
+
+```typescript
+const aligned = Math.ceil(offset / 256) * 256;  // 256 = WebGPU storage buffer 最小对齐（规范 §3.6.2）
+const typeId = flags & 0x0f;  // 低 4 位 = 材质类型 ID，与 WGSL 侧常量严格同步
+if (++retryCount > 3) return null;  // 3 次封顶：单次超时 5s，再多用户感知为卡死
+```
+
+行尾复述语法是废话；行尾写值语义、出处、改动影响是规范要求的锚点。区别在信息增量。
 
 ## 废弃 API 标注
 

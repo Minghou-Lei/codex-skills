@@ -13,13 +13,13 @@
 /**
  * @file    RenderGraph.h
  * @brief   渲染图（RenderGraph）的核心调度器，负责管理 Pass 依赖与资源生命周期
- * @author  MinghouLei
- * @date    2025-01-10
  *
  * @note    本文件不依赖平台 RHI，仅处理抽象资源描述符。
  *          实际 GPU 提交由 RHICommandList 层完成。
  */
 ```
+
+`@author` / `@date` 仅在项目规范明确要求时添加：VCS 已记录作者与日期，这类字段极易过时。
 
 ## 类注释
 
@@ -122,6 +122,23 @@ InsertUAVBarrier();
 i++;            // 递增 i        ← 废话注释
 return result;  // 返回结果      ← 废话注释
 ```
+
+### 行级锚点：短注释贴行尾，长解释放行上
+
+```cpp
+SetDepthBias(0.005f);  // 5e-3 = Shadow Acne 消除经验值，再大会出现 Peter-Panning
+const uint32 TypeId = Flags & 0x0F;  // 低 4 位 = 材质类型 ID，布局与 GBufferLayout.h 严格同步
+if (++RetryCount > 3) return false;  // 3 次封顶：单次网络超时 5s，再多用户感知为卡死
+
+// 复合条件的领域含义放行上：只对"已加载、可见、未被遮挡剔除"的批次提交绘制
+if (bLoaded && bVisible && !bOccluded)
+{
+    SubmitBatch();
+}
+```
+
+行尾复述语法（`i++; // 递增 i`）是废话；行尾写值语义、出处、改动影响是规范要求的
+锚点。区别在信息增量，不在位置。
 
 ## TODO / FIXME 格式
 
