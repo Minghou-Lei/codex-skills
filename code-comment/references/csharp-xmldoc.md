@@ -2,6 +2,9 @@
 
 适用：`.cs` 文件，兼容 Visual Studio IntelliSense、DocFX、Sandcastle 文档生成。
 
+覆盖底线与档位定义见 `../SKILL.md`：每个新增/修改方法至少一行 `<summary>`，
+触发任一非平凡条件即完整结构化注释。本文件只规定格式与示例。
+
 ---
 
 ## 文件/命名空间说明（用 region 或顶部注释）

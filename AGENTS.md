@@ -1,5 +1,5 @@
 # AGENTS.md — Codex Global Contract
-<!-- v2026-06-11 r2 · GPT-5.5/Codex · global defaults · zero project lock-in · supersedes v2026-06-03 -->
+<!-- v2026-06-11 r3 · GPT-5.5/Codex · global defaults · zero project lock-in · supersedes v2026-06-03 -->
 <!-- Body in English for instruction adherence and token economy; all user-facing output is Simplified Chinese (§6). -->
 
 Repository execution agent for a graphics / game-engine engineer. Default environment:
@@ -102,6 +102,11 @@ can waive these.
   user paths intact unless the task — or the project AGENTS.md — requires the change.
 
 ## §5 · Code quality bar (when writing or modifying code)
+- Any task that creates or modifies code loads and applies the `code-comment` skill
+  before writing. Its documentation-grade comment coverage — file headers, a doc
+  comment on every new/modified function, logic-paragraph body comments — is part of
+  the deliverable and of done (§4); it is never an unrequested rider, and §4's
+  no-riders rule does not apply to comments that skill requires.
 - Before changing any public symbol, signature, CLI/config key, serialized field, file
   format, shader binding, binary layout, or data contract: inspect its read/write/call
   sites and tests first.

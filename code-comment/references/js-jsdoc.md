@@ -2,6 +2,9 @@
 
 适用：`.js` `.ts` `.jsx` `.tsx`，兼容 VS Code IntelliSense、TypeDoc、ESLint jsdoc 插件。
 
+覆盖底线与档位定义见 `../SKILL.md`：每个新增/修改函数至少一行 JSDoc，
+触发任一非平凡条件即完整结构化注释。本文件只规定格式与示例。
+
 ---
 
 ## 文件头注释

@@ -2,6 +2,9 @@
 
 适用：`.java` 文件，兼容 javadoc 工具、IntelliJ IDEA、Checkstyle。
 
+覆盖底线与档位定义见 `../SKILL.md`：每个新增/修改方法至少一行 Javadoc，
+触发任一非平凡条件即完整结构化注释。本文件只规定格式与示例。
+
 ---
 
 ## 类注释

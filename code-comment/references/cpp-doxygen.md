@@ -2,6 +2,9 @@
 
 适用：`.cpp` `.h` `.hpp` `.cc`，引擎项目（UE、KG3D 等）中的 C++ 代码。
 
+覆盖底线与档位定义见 `../SKILL.md`：每个新增/修改函数至少档位 A（单行职责注释），
+触发任一非平凡条件即档位 S（完整结构化）。本文件只规定格式与示例。
+
 ---
 
 ## 文件头注释
@@ -58,21 +61,25 @@ class FDeferredShadingPass : public FRenderPass
 bool EncodeNormalToGBuffer(const FVector3f& WorldNormal, FVector2f& OutEncoded);
 ```
 
-### 档位 0：名字自解释 → 不写注释
+### 档位 A：平凡函数 → 单行注释（不允许裸函数）
 
 ```cpp
-// ❌ 这种注释是噪声
-/** @brief 获取材质名称 */
+// ❌ 不允许：新增/修改的函数没有任何注释
 FString GetMaterialName() const;
 
-// ✅ 沉默就是最好的答案
+// ✅ 字面职责之上能补的上下文（来源、稳定性、空值语义、调用时机）必须补上
+/** 材质名称，取自资产路径末段；资产热重载后保持稳定，可作缓存 key */
 FString GetMaterialName() const;
+
+// ✅ 确实无可补充时，平实的一行职责注释也必须存在
+/** 当前激活的 LOD 层级，范围 [0, MaxLOD] */
+int32 GetActiveLOD() const;
 ```
 
-### 档位 A/S 边界：简单函数但有隐性约束 → 单行即可
+### 档位 A 升 S 的边界：签名简单但有隐性约束 → 把约束写出来
 
 ```cpp
-// 必须在 Initialize() 之前调用，运行时调整无效
+/** 设置实例上限；必须在 Initialize() 之前调用，运行时调整无效 */
 void SetMaxInstances(int32 MaxCount);
 ```
 

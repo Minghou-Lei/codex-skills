@@ -2,6 +2,9 @@
 
 适用：`.py` 文件，兼容 Sphinx 自动文档生成与 pylint 检查。
 
+覆盖底线与档位定义见 `../SKILL.md`：每个新增/修改函数至少档位 A（单行 docstring），
+触发任一非平凡条件即档位 S（完整 Google Style）。本文件只规定格式与示例。
+
 ---
 
 ## 模块头注释
@@ -54,20 +57,20 @@ def encode_normal_octahedron(normal: np.ndarray) -> np.ndarray:
     """
 ```
 
-### 档位 0：简单函数 → 不写 docstring
+### 档位 A：平凡函数 → 单行 docstring（不允许裸函数）
 
 ```python
-# ❌ 多余
+# ❌ 不允许：新增/修改的函数没有 docstring
 def get_name(self) -> str:
-    """获取名称。"""
     return self._name
 
-# ✅ 沉默
+# ✅ 字面职责之上能补的上下文（来源、稳定性、空值语义、调用时机）必须补上
 def get_name(self) -> str:
+    """材质名称，取自资产路径末段；资产热重载后保持稳定，可作缓存 key。"""
     return self._name
 ```
 
-### 档位 A：有单一关键约束 → 单行 docstring
+### 档位 A 升 S 的边界：签名简单但有单一关键约束 → 约束写进单行
 
 ```python
 def set_max_retries(self, count: int) -> None:
